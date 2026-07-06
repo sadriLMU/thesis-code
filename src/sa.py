@@ -65,7 +65,8 @@ def simulated_annealing(
         - best_circuit: list of gates
         - best_fidelity: float
         - best_gate_count: int
-        - history: list of best fidelity per iteration
+        - history: list of best fidelity per iteration (pure fidelity,
+                   matching ea.py's history — not the penalized fitness score)
     """
     # Initialize with a random circuit
     current_circuit = random_circuit(n_qubits, n_gates)
@@ -73,6 +74,7 @@ def simulated_annealing(
 
     best_circuit = current_circuit[:]
     best_score = current_score
+    best_fidelity = compute_fidelity(best_circuit, target_state, n_qubits)
 
     temperature = initial_temp
     history = []
@@ -93,9 +95,13 @@ def simulated_annealing(
         if current_score > best_score:
             best_circuit = current_circuit[:]
             best_score = current_score
+            # Only recompute fidelity when the best circuit actually changes,
+            # to avoid an extra Statevector simulation on every iteration.
+            best_fidelity = compute_fidelity(best_circuit, target_state, n_qubits)
 
-        # Track best fidelity
-        history.append(best_score)
+        # Track best fidelity (pure fidelity, not the penalized fitness score,
+        # so this history is directly comparable to ea.py's history)
+        history.append(best_fidelity)
 
         # Cool down
         temperature *= cooling_rate
