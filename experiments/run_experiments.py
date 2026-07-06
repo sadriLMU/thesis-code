@@ -2,9 +2,17 @@
 run_experiments.py
 
 Runs the Evolutionary Algorithm (EA) and Simulated Annealing (SA) on
-multiple Haar-random target states (4 qubits) and saves:
-  - results/results.csv        : one row per (target, algorithm) run
-  - results/convergence.png    : mean +/- std convergence curves
+multiple Haar-random target states (4 qubits). Each execution creates
+a timestamped folder under results/runs/<run_id>/ containing:
+  - results.csv           : one row per (target, algorithm) run
+  - config.json           : every parameter used, for reproducibility
+  - convergence.png       : EA/SA side-by-side subplots
+  - convergence_overlay.png : EA vs. SA fidelity on one shared axis
+
+In addition, results/all_runs_summary.csv accumulates one summary row
+per algorithm per run (mean/std fidelity, mean/std gate count), so you
+can track how parameter changes affected performance across every run
+you've done over the course of the thesis.
 
 Usage:
     cd thesis-code
@@ -14,6 +22,8 @@ Usage:
 import sys
 import os
 import csv
+import json
+from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -59,7 +69,16 @@ SA_PARAMS = dict(
 )
 
 RESULTS_DIR = os.path.join(SCRIPT_DIR, "..", "results")
-os.makedirs(RESULTS_DIR, exist_ok=True)
+RUNS_DIR = os.path.join(RESULTS_DIR, "runs")
+SUMMARY_PATH = os.path.join(RESULTS_DIR, "all_runs_summary.csv")
+os.makedirs(RUNS_DIR, exist_ok=True)
+
+# Every execution gets its own timestamped folder under results/runs/,
+# so re-running the script with different parameters never overwrites
+# a previous run's data.
+RUN_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
+RUN_DIR = os.path.join(RUNS_DIR, RUN_ID)
+os.makedirs(RUN_DIR, exist_ok=True)
 
 
 # ---------------------------------------------------------------------------
@@ -73,7 +92,7 @@ def run_all():
         rows          : list of dicts, one per (target, algorithm) run
                          -> written directly to CSV
         ea_histories  : list of per-generation fidelity histories (one per target)
-        sa_histories  : list of per-iteration fitness-score histories (one per target)
+        sa_histories  : list of per-iteration fidelity histories (one per target)
     """
     rows = []
     ea_histories = []
@@ -121,6 +140,70 @@ def run_all():
 
 
 # ---------------------------------------------------------------------------
+# Output: run config snapshot (for reproducibility)
+# ---------------------------------------------------------------------------
+def save_config(path):
+    """
+    Writes every parameter used for this run to a JSON file, so a given
+    results.csv / plot can always be traced back to the exact configuration
+    that produced it. This matters for the thesis's Methodology/Experiments
+    chapters: any reported number should be attributable to a specific,
+    reproducible run.
+    """
+    config = {
+        "run_id": RUN_ID,
+        "n_qubits": N_QUBITS,
+        "n_targets": N_TARGETS,
+        "base_seed": BASE_SEED,
+        "alpha": ALPHA,
+        "beta": BETA,
+        "ea_params": EA_PARAMS,
+        "sa_params": SA_PARAMS,
+    }
+    with open(path, "w") as f:
+        json.dump(config, f, indent=2)
+    print(f"Saved run config to {path}")
+
+
+# ---------------------------------------------------------------------------
+# Output: append aggregated stats to a master log across all runs
+# ---------------------------------------------------------------------------
+def append_summary(rows, path):
+    """
+    Appends one row per algorithm to results/all_runs_summary.csv, holding
+    the mean/std fidelity and mean gate count across all N_TARGETS target
+    states for this run. Unlike results.csv (which is per-run and detailed),
+    this file accumulates across every run you've ever done, so you can
+    track how changes to parameters (pop_size, alpha/beta, cooling_rate,
+    etc.) affected performance over the course of your thesis work.
+    """
+    is_new_file = not os.path.exists(path)
+
+    summary_rows = []
+    for algo in ("EA", "SA"):
+        fidelities = [r["fidelity"] for r in rows if r["algorithm"] == algo]
+        gate_counts = [r["gate_count"] for r in rows if r["algorithm"] == algo]
+        summary_rows.append({
+            "run_id": RUN_ID,
+            "algorithm": algo,
+            "n_targets": N_TARGETS,
+            "mean_fidelity": np.mean(fidelities),
+            "std_fidelity": np.std(fidelities),
+            "mean_gate_count": np.mean(gate_counts),
+            "std_gate_count": np.std(gate_counts),
+        })
+
+    fieldnames = ["run_id", "algorithm", "n_targets", "mean_fidelity",
+                  "std_fidelity", "mean_gate_count", "std_gate_count"]
+    with open(path, "a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        if is_new_file:
+            writer.writeheader()
+        writer.writerows(summary_rows)
+    print(f"Appended run summary to {path}")
+
+
+# ---------------------------------------------------------------------------
 # Output: CSV
 # ---------------------------------------------------------------------------
 def save_csv(rows, path):
@@ -137,14 +220,19 @@ def save_csv(rows, path):
 # ---------------------------------------------------------------------------
 def plot_convergence(ea_histories, sa_histories, path):
     """
-    Plots mean +/- std convergence curves for EA and SA in separate
-    subplots (NOT overlaid on one axis).
+    Plots mean +/- std convergence curves for EA and SA.
 
-    IMPORTANT: ea.py's history tracks pure fidelity per generation, while
-    sa.py's history tracks the penalized fitness score
-    (alpha*fidelity - beta*gate_count) per iteration. These are different
-    quantities, so they are plotted separately with distinct y-axis labels
-    rather than compared directly on one chart.
+    Both ea.py and sa.py now log pure fidelity per step (see sa.py's
+    updated `history` tracking), so this produces two figures:
+      1. A shared-axis overlay comparing EA vs. SA directly (the version
+         you'd typically put in the Experiments chapter).
+      2. Separate subplots, kept because EA's x-axis is "generation"
+         (1 step = evaluate an entire population of pop_size candidates)
+         while SA's x-axis is "iteration" (1 step = evaluate a single
+         neighbor). The step counts are not directly comparable in terms
+         of wall-clock cost or candidates evaluated, only in terms of
+         final fidelity reached -- worth stating explicitly in your
+         Methodology/Discussion text if you use the overlay plot.
     """
     ea_arr = np.array(ea_histories)  # shape: (N_TARGETS, n_generations)
     sa_arr = np.array(sa_histories)  # shape: (N_TARGETS, n_iterations)
@@ -152,7 +240,30 @@ def plot_convergence(ea_histories, sa_histories, path):
     ea_mean, ea_std = ea_arr.mean(axis=0), ea_arr.std(axis=0)
     sa_mean, sa_std = sa_arr.mean(axis=0), sa_arr.std(axis=0)
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    # --- Figure 1: shared-axis overlay ---
+    fig1, ax = plt.subplots(figsize=(7, 5))
+    ax.plot(ea_mean, color="tab:blue", label="EA (mean)")
+    ax.fill_between(
+        range(len(ea_mean)), ea_mean - ea_std, ea_mean + ea_std,
+        alpha=0.2, color="tab:blue",
+    )
+    ax.plot(sa_mean, color="tab:orange", label="SA (mean)")
+    ax.fill_between(
+        range(len(sa_mean)), sa_mean - sa_std, sa_mean + sa_std,
+        alpha=0.2, color="tab:orange",
+    )
+    ax.set_title("EA vs. SA Convergence (Fidelity)")
+    ax.set_xlabel("Step (EA: generation, SA: iteration)")
+    ax.set_ylabel("Best fidelity")
+    ax.legend()
+    plt.tight_layout()
+    overlay_path = path.replace(".png", "_overlay.png")
+    plt.savefig(overlay_path, dpi=150)
+    plt.close(fig1)
+    print(f"Saved overlay convergence plot to {overlay_path}")
+
+    # --- Figure 2: separate subplots (for reference / appendix) ---
+    fig2, axes = plt.subplots(1, 2, figsize=(12, 5))
 
     axes[0].plot(ea_mean, color="tab:blue", label="EA (mean)")
     axes[0].fill_between(
@@ -171,20 +282,25 @@ def plot_convergence(ea_histories, sa_histories, path):
     )
     axes[1].set_title("SA Convergence")
     axes[1].set_xlabel("Iteration")
-    axes[1].set_ylabel("Best fitness score (alpha*fidelity - beta*gates)")
+    axes[1].set_ylabel("Best fidelity")
     axes[1].legend()
 
     plt.tight_layout()
     plt.savefig(path, dpi=150)
-    plt.close(fig)
-    print(f"Saved convergence plot to {path}")
+    plt.close(fig2)
+    print(f"Saved side-by-side convergence plot to {path}")
 
 
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     rows, ea_histories, sa_histories = run_all()
-    save_csv(rows, os.path.join(RESULTS_DIR, "results.csv"))
+
+    save_csv(rows, os.path.join(RUN_DIR, "results.csv"))
+    save_config(os.path.join(RUN_DIR, "config.json"))
+    append_summary(rows, SUMMARY_PATH)
     plot_convergence(
         ea_histories, sa_histories,
-        os.path.join(RESULTS_DIR, "convergence.png"),
+        os.path.join(RUN_DIR, "convergence.png"),
     )
+
+    print(f"\nRun complete. All outputs for this run are in: {RUN_DIR}")
