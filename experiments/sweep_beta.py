@@ -44,7 +44,10 @@ N_TARGETS = 10          # same as the original run, so results are comparable
 BASE_SEED = 42
 
 ALPHA = 1.0
-BETA_VALUES = [0.01, 0.05, 0.1, 0.2, 0.4]   # the parameter under test
+BETA_VALUES = [0.01, 0.02, 0.03, 0.05, 0.07]  # finer resolution to find the
+                                                 # saturation transition point;
+                                                 # 0.1/0.2/0.4 already confirmed
+                                                 # redundant in the first sweep
 
 # EA/SA parameters held fixed across the sweep (only beta changes)
 EA_FIXED_PARAMS = dict(
