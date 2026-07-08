@@ -4,11 +4,14 @@ from circuit_utils import random_circuit, random_gate
 from fitness import fitness, compute_fidelity, compute_gate_count
 
 
-def neighbor(circuit: list, n_qubits: int) -> list:
+def neighbor(circuit: list, n_qubits: int, max_gates: int) -> list:
     """
     Generate a neighboring circuit by applying one of three operations:
     - Replace a random gate
-    - Insert a random gate at a random position
+    - Insert a random gate at a random position (capped at max_gates,
+      matching EA's mutate() constraint -- without this cap, SA's circuit
+      length can grow unboundedly over the course of the search, since
+      nothing here previously stopped repeated accepted 'insert' moves)
     - Delete a random gate
     """
     new_circuit = circuit[:]
@@ -23,7 +26,7 @@ def neighbor(circuit: list, n_qubits: int) -> list:
         idx = np.random.randint(len(new_circuit))
         new_circuit[idx] = random_gate(n_qubits)
 
-    elif operation == 'insert':
+    elif operation == 'insert' and len(new_circuit) < max_gates:
         idx = np.random.randint(len(new_circuit) + 1)
         new_circuit.insert(idx, random_gate(n_qubits))
 
@@ -58,8 +61,14 @@ def simulated_annealing(
     beta: float = 0.01,
     verbose: bool = True
 ) -> dict:
+    print(">>> RUNNING FIXED SA VERSION (growth-cap-v2) <<<")
     """
     Run Simulated Annealing for quantum circuit synthesis.
+
+    n_gates serves two roles, mirroring EA's max_gates parameter:
+    (1) the upper bound for the randomly chosen starting circuit length,
+    (2) the hard cap that neighbor() enforces during the search, so the
+    circuit can never grow past n_gates via repeated 'insert' moves.
 
     Returns a dict with:
         - best_circuit: list of gates
@@ -68,8 +77,8 @@ def simulated_annealing(
         - history: list of best fidelity per iteration (pure fidelity,
                    matching ea.py's history — not the penalized fitness score)
     """
-    # Initialize with a random circuit
-    current_circuit = random_circuit(n_qubits, n_gates)
+    start_len = np.random.randint(1, n_gates + 1)
+    current_circuit = random_circuit(n_qubits, start_len)
     current_score = fitness(current_circuit, target_state, n_qubits, alpha, beta)
 
     best_circuit = current_circuit[:]
@@ -81,36 +90,27 @@ def simulated_annealing(
     iteration = 0
 
     while temperature > min_temp and iteration < max_iterations:
-        # Generate neighbor
-        new_circuit = neighbor(current_circuit, n_qubits)
+        new_circuit = neighbor(current_circuit, n_qubits, max_gates=n_gates)
         new_score = fitness(new_circuit, target_state, n_qubits, alpha, beta)
 
-        # Acceptance
         ap = acceptance_probability(current_score, new_score, temperature)
         if np.random.random() < ap:
             current_circuit = new_circuit
             current_score = new_score
 
-        # Update best
         if current_score > best_score:
             best_circuit = current_circuit[:]
             best_score = current_score
-            # Only recompute fidelity when the best circuit actually changes,
-            # to avoid an extra Statevector simulation on every iteration.
             best_fidelity = compute_fidelity(best_circuit, target_state, n_qubits)
 
-        # Track best fidelity (pure fidelity, not the penalized fitness score,
-        # so this history is directly comparable to ea.py's history)
         history.append(best_fidelity)
 
-        # Cool down
         temperature *= cooling_rate
         iteration += 1
 
         if verbose and iteration % 500 == 0:
-            f = compute_fidelity(best_circuit, target_state, n_qubits)
             print(f"Iter {iteration:5d} | Temp: {temperature:.5f} | "
-                  f"Best fitness: {best_score:.4f} | Fidelity: {f:.4f}")
+                  f"Best fitness: {best_score:.4f} | Fidelity: {best_fidelity:.4f}")
 
     return {
         'best_circuit': best_circuit,
