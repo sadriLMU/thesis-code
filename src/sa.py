@@ -52,32 +52,31 @@ def acceptance_probability(current_score: float, new_score: float,
 def simulated_annealing(
     target_state: Statevector,
     n_qubits: int,
-    n_gates: int = 20,
+    max_gates: int = 15,
     initial_temp: float = 1.0,
     cooling_rate: float = 0.995,
     min_temp: float = 1e-4,
-    max_iterations: int = 5000,
+    max_iterations: int = 2000,
     alpha: float = 1.0,
     beta: float = 0.01,
     verbose: bool = True
 ) -> dict:
-    print(">>> RUNNING FIXED SA VERSION (growth-cap-v2) <<<")
     """
     Run Simulated Annealing for quantum circuit synthesis.
 
-    n_gates serves two roles, mirroring EA's max_gates parameter:
+    max_gates serves two roles, mirroring EA's max_gates parameter:
     (1) the upper bound for the randomly chosen starting circuit length,
     (2) the hard cap that neighbor() enforces during the search, so the
-    circuit can never grow past n_gates via repeated 'insert' moves.
+    circuit can never grow past max_gates via repeated 'insert' moves.
 
     Returns a dict with:
         - best_circuit: list of gates
         - best_fidelity: float
         - best_gate_count: int
         - history: list of best fidelity per iteration (pure fidelity,
-                   matching ea.py's history — not the penalized fitness score)
+                   matching ea.py's history -- not the penalized fitness score)
     """
-    start_len = np.random.randint(1, n_gates + 1)
+    start_len = np.random.randint(1, max_gates + 1)
     current_circuit = random_circuit(n_qubits, start_len)
     current_score = fitness(current_circuit, target_state, n_qubits, alpha, beta)
 
@@ -90,7 +89,7 @@ def simulated_annealing(
     iteration = 0
 
     while temperature > min_temp and iteration < max_iterations:
-        new_circuit = neighbor(current_circuit, n_qubits, max_gates=n_gates)
+        new_circuit = neighbor(current_circuit, n_qubits, max_gates=max_gates)
         new_score = fitness(new_circuit, target_state, n_qubits, alpha, beta)
 
         ap = acceptance_probability(current_score, new_score, temperature)
@@ -107,14 +106,3 @@ def simulated_annealing(
 
         temperature *= cooling_rate
         iteration += 1
-
-        if verbose and iteration % 500 == 0:
-            print(f"Iter {iteration:5d} | Temp: {temperature:.5f} | "
-                  f"Best fitness: {best_score:.4f} | Fidelity: {best_fidelity:.4f}")
-
-    return {
-        'best_circuit': best_circuit,
-        'best_fidelity': compute_fidelity(best_circuit, target_state, n_qubits),
-        'best_gate_count': compute_gate_count(best_circuit),
-        'history': history
-    }
