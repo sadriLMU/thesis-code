@@ -2,7 +2,7 @@
 
 Purpose: this file preserves the *interpretation* of each experiment, not just the
 raw numbers (those already live in `results/runs/<run_id>/` automatically).
-Fill in the "Your interpretation" sections in your own words before moving on —
+Fill in the "Your interpretation" sections in your own words before moving on -
 this is the material you'll draw on when writing the Discussion chapter, so it
 needs to sound like your own reasoning, not a paraphrase of what Claude said.
 
@@ -210,7 +210,72 @@ around beta=0.02-0.03, hidden previously by the growth-cap bug.
 
 ---
 
-## Entry 6 - [date] - [experiment name]
+## Entry 6 - 2026-07-18 - Optuna hyperparameter tuning (initial run)
+
+**Run ID:** N/A (Optuna studies, not a single run) - `results/optuna_studies/`
+**Script:** `tune_hyperparams.py`
+**Config:** N_TUNING_TARGETS=5, seeds 42-46, N_TRIALS_EA=30, N_TRIALS_SA=30,
+beta=0.01 fixed, EA budget: max_gates=15/n_generations=100 fixed, SA budget:
+n_gates=20/max_iterations=2000 fixed. Objective: mean fitness
+(alpha*fidelity - beta*gate_count) across the 5 tuning targets.
+
+**Why this run:** per Leo's feedback (week 2 meeting), replace manual
+hyperparameter guessing (mutation_rate=0.1, cooling_rate=0.995, etc.) with
+a systematic search using Optuna.
+
+**Optuna results:**
+
+| | EA | SA |
+|---|---|---|
+| Tuned params | pop_size=57, mutation_rate=0.127 | initial_temp=0.173, cooling_rate=0.992 |
+| Previous (manual) params | pop_size=30, mutation_rate=0.1 | initial_temp=1.0, cooling_rate=0.995 |
+| Best mean fitness (tuning set) | 0.4227 | 0.4042 |
+
+**Applied the tuned params and re-ran the main 10-target comparison
+(run_id `20260718_162342`), compared to Entry 4 (manual params):**
+
+| | EA (manual) | EA (tuned) | SA (manual) | SA (tuned) |
+|---|---|---|---|---|
+| Mean fidelity | 0.406 | 0.499 | 0.475 | 0.514 |
+| Mean gate count | 4.7 | 5.8 | 7.8 | 8.0 |
+| Gate count std | 1.49 | ~1.75 | 3.19 | ~2.79 |
+
+Both algorithms improved in fidelity; EA improved more (+23%) than SA (+8%).
+Plausible explanation: EA's population size nearly doubled (30->57), a bigger
+structural change to the search than SA's tuning (lower starting temperature,
+same search mechanics).
+
+**Important methodological issue found (to be fixed in Entry 7):** the 5
+tuning target seeds (42-46) overlap with 5 of the 10 seeds (42-51) used for
+the reported comparison. This means hyperparameters were partly selected on
+the same targets they are later evaluated on - similar to a train/test
+leakage problem. Fix in progress: re-tune on a disjoint seed range (100+).
+
+**Your interpretation (fill in):**
+- Does the size of EA's improvement vs. SA's make sense given what actually
+  changed in each algorithm's tuned parameters? _______________
+- How big a deal is the tuning/reporting seed overlap for the validity of
+  these numbers - cosmetic concern or a real thing to fix before reporting? _______________
+
+---
+
+## Entry 7 - [date] - Re-tuned on disjoint seeds (fixes Entry 6's overlap issue)
+
+**Run ID:**
+**Script:** `tune_hyperparams.py` (BASE_SEED changed from 42 to 100)
+
+**Why this run:** Entry 6's tuning seeds (42-46) overlapped with the
+reporting seeds (42-51). Re-tuning on seeds 100-104 removes this overlap.
+
+**Raw results:**
+
+**Your interpretation:**
+
+**Open question / next step:**
+
+---
+
+## Entry 8 - [date] - [experiment name]
 
 **Run ID:**
 **Script:**
