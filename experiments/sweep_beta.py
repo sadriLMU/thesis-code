@@ -40,7 +40,7 @@ from sa import simulated_annealing
 # Configuration
 # ---------------------------------------------------------------------------
 N_QUBITS = 4
-N_TARGETS = 10          # same as the original run, so results are comparable
+N_TARGETS = 20          # matches Entry 7's expanded sample (was 10)
 BASE_SEED = 42
 
 ALPHA = 1.0
@@ -52,17 +52,17 @@ BETA_VALUES = [0.01, 0.02, 0.03, 0.05, 0.07]   # finer resolution to find the
 # EA/SA parameters held fixed across the sweep (only beta changes)
 EA_FIXED_PARAMS = dict(
     max_gates=15,
-    pop_size=57,          # Optuna-tuned (was 30) -- see results/optuna_studies/ea_best_params.json
+    pop_size=67,          # Optuna-tuned (disjoint seeds 100-104) -- see Entry 7
     n_generations=100,
-    mutation_rate=0.1268981724735541,  # Optuna-tuned (was 0.1)
+    mutation_rate=0.0779,  # Optuna-tuned (disjoint seeds 100-104)
     alpha=ALPHA,
     verbose=False,
 )
 
 SA_FIXED_PARAMS = dict(
-    n_gates=20,
-    initial_temp=0.1734730134449593,  # Optuna-tuned (was 1.0)
-    cooling_rate=0.9920719466669397,  # Optuna-tuned (was 0.995)
+    max_gates=15,
+    initial_temp=0.256,   # Optuna-tuned (disjoint seeds 100-104) -- see Entry 7
+    cooling_rate=0.9769,  # Optuna-tuned (disjoint seeds 100-104)
     min_temp=1e-4,
     max_iterations=2000,
     alpha=ALPHA,
