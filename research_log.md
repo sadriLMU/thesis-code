@@ -390,3 +390,81 @@ been an open question since Entry 5 and is now the most important remaining
 gap before treating these results as final.
 
 ---
+
+## Entry 9 - 2026-07-18 - Repeated runs (5x per target) confirm EA's advantage is real
+
+**Run ID:** `20260718_193345_repeated`
+**Script:** `run_experiments_repeated.py`
+**Config:** N_QUBITS=4, N_TARGETS=20 (seeds 42-61), N_REPEATS=5 per target,
+beta=0.01, EA: pop_size=67/mutation_rate=0.0779 (Optuna-tuned), SA:
+initial_temp=0.256/cooling_rate=0.9769 (Optuna-tuned) - same parameters as
+Entry 7/8, now with 5 repetitions per target instead of 1.
+
+**Why this run:** Entries 4, 6, 7, and 8 all reported results from a single
+run per target, which is not statistically robust for stochastic algorithms
+like EA/SA. This was flagged as an open question since Entry 5. Given the
+significant reversal found in Entry 7 (EA now beating SA, opposite of
+Entries 1/4/6), it became important to check whether this reversal holds up
+under repeated sampling, or whether it was itself an artifact of single-run
+noise.
+
+**Overall results (mean across 20 targets, 5 repeats each = 100 runs per algorithm):**
+
+| | EA | SA |
+|---|---|---|
+| Mean fidelity | 0.4728 | 0.3790 |
+| Mean gate count | 5.29 | 6.36 |
+| Within-target fidelity std (run-to-run noise) | 0.0417 | 0.0642 |
+| Across-target fidelity std (target difficulty variation) | 0.0945 | 0.0794 |
+
+**Key finding: EA's advantage survives repeated sampling.** The fidelity gap
+between EA and SA (0.4728 - 0.3790 = 0.0938) is larger than either
+algorithm's own run-to-run noise (0.0417 for EA, 0.0642 for SA). This means
+the reversal first observed in Entry 7 (EA outperforming SA, after fixing
+the tuning/reporting seed overlap and the sa.py truncation bug) is not
+simply single-run noise - it holds up when each target is run 5 times
+independently.
+
+**Secondary finding, consistent with every prior entry:** SA continues to
+show substantially higher run-to-run variance than EA (within-target std
+0.0642 vs. 0.0417, roughly 1.5x), even with both known sa.py bugs fixed.
+This appears to be a genuine property of SA's single-trajectory search
+process rather than a bug artifact, since it persists after Entry 3's
+fixes and across every corrected entry since (4, 7, 8, and now 9).
+
+**Comparison to single-run results:**
+
+| | Entry 7 (1 run/target) | Entry 9 (5 runs/target, averaged) |
+|---|---|---|
+| EA mean fidelity | 0.462 | 0.4728 |
+| SA mean fidelity | 0.384 | 0.3790 |
+
+Close agreement between the single-run and repeated-run means confirms
+Entry 7's single-run numbers were not a fluke - repeating the experiment
+with more samples gives essentially the same picture.
+
+**Also observed:** across-target variation (how much target difficulty
+varies) is larger than within-target run-to-run noise for both algorithms -
+i.e., which target state is being synthesised matters more to the outcome
+than randomness in a single algorithm run. This is a plausible, if
+unsurprising, property of Haar-random states (some are closer to
+low-complexity/structured states than others) worth a mention in Discussion.
+
+**Your interpretation (fill in):**
+- Given this result, how confident are you now in framing RQ2's answer as
+  "EA outperforms SA" rather than "it depends on conditions"? _______________
+- Why might SA's search process inherently produce more run-to-run variance
+  than EA's, even with a correct implementation (i.e., is this a fundamental
+  property of single-trajectory vs. population-based search)? _______________
+- Does the target-difficulty-variation finding suggest anything about which
+  kinds of Haar-random states are harder to approximate, worth investigating
+  further, or is it out of scope for this thesis? _______________
+
+**Open question / next step:** with this statistical confirmation in hand,
+proceed to write Section 5.2 (Main Comparison) and 5.3 (Beta Sensitivity)
+using these repeated-run numbers (Entry 9) as the primary reported results,
+rather than the single-run numbers from Entry 7/8. Consider also running a
+repeated version of the beta sweep (Entry 8) for the same level of
+confidence, time permitting.
+
+---
