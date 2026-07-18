@@ -331,18 +331,62 @@ Experiments chapter.
 
 ---
 
-## Entry 8 - [date] - [experiment name]
+## Entry 8 - 2026-07-18 - Beta sweep with final (disjoint-seed-tuned) parameters, 20 targets
 
-**Run ID:**
-**Script:**
-**Config:**
+**Run ID:** `20260718_180425_beta_sweep`
+**Script:** `sweep_beta.py`
+**Config:** N_QUBITS=4, N_TARGETS=20 (up from 10), beta in {0.01, 0.02, 0.03, 0.05, 0.07},
+EA: max_gates=15, pop_size=67, mutation_rate=0.0779 (Optuna-tuned, disjoint seeds 100-104),
+SA: max_gates=15, initial_temp=0.256, cooling_rate=0.9769 (Optuna-tuned, disjoint seeds 100-104)
 
-**Why this run:**
+**Why this run:** re-run the beta sensitivity sweep with the final, correctly
+tuned hyperparameters from Entry 7 (previous sweep in Entry 5 used the
+overlapping-seed-tuned parameters and the not-yet-truncation-fixed sa.py),
+and expanded to 20 targets to match the main comparison's sample size.
 
-**Raw results:**
+**Aggregated results (mean across 20 targets):**
 
-**Your interpretation:**
+| beta | EA fidelity | EA gates | SA fidelity | SA gates | EA fid/gate | SA fid/gate |
+|---|---|---|---|---|---|---|
+| 0.01 | 0.462 | 4.85 | 0.384 | 6.05 | 0.095 | 0.064 |
+| 0.02 | 0.445 | 4.25 | 0.322 | 4.45 | 0.105 | 0.072 |
+| 0.03 | 0.427 | 3.20 | 0.305 | 3.45 | 0.134 | 0.088 |
+| 0.05 | 0.350 | 2.50 | 0.276 | 2.55 | 0.140 | 0.108 |
+| 0.07 | 0.276 | 1.70 | 0.271 | 1.95 | 0.163 | 0.139 |
 
-**Open question / next step:**
+**Consistency check passed:** beta=0.01 here reproduces Entry 7's numbers
+exactly (EA 0.462/4.85, SA 0.384/6.05), confirming this sweep and the main
+comparison genuinely use the same corrected code, parameters, and seeds.
+
+**Major reversal from Entry 5's "efficiency crossover":** Entry 5 (buggy SA,
+overlapping tuning seeds) found that SA's fidelity-per-gate overtook EA's
+around beta=0.02-0.03. With the truncation bug fixed and disjoint-seed
+tuning, **this crossover disappears entirely**. EA now has equal or higher
+fidelity-per-gate than SA at every tested beta value, with the gap only
+closing to near-parity at the highest beta tested (0.07: 0.163 vs 0.139).
+EA also has equal or higher raw fidelity at every beta value.
+
+**What this means for the thesis narrative:** the "SA becomes more efficient
+at higher beta" finding from Entry 5 was an artifact of the bugs and/or the
+seed overlap, not a real property of the algorithms. Combined with Entry 7's
+reversal (EA now beats SA on the main comparison too), the corrected data
+tells a more consistent story than the buggy data did: EA outperforms SA
+fairly consistently on both fidelity and gate-efficiency, at least across
+this beta range and with these tuned hyperparameters.
+
+**Your interpretation (fill in):**
+- Does EA's consistent advantage here change your overall thesis framing
+  from "EA vs SA trade-off" to "EA outperforms SA under these conditions"? _______________
+- Is there a beta value or regime where you'd still expect SA to have an
+  advantage, based on how the two algorithms search differently? _______________
+- Given this is still one run per (target, beta) combination, how much
+  weight should this sweep carry in the final Discussion, versus being
+  presented as a preliminary/exploratory result? _______________
+
+**Open question / next step:** repeated runs per target (5-10 runs, averaged)
+to check whether EA's advantage holds up under proper statistical
+averaging, or whether some of this gap is still single-run noise. This has
+been an open question since Entry 5 and is now the most important remaining
+gap before treating these results as final.
 
 ---
