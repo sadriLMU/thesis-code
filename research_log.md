@@ -259,19 +259,75 @@ leakage problem. Fix in progress: re-tune on a disjoint seed range (100+).
 
 ---
 
-## Entry 7 - [date] - Re-tuned on disjoint seeds (fixes Entry 6's overlap issue)
+## Entry 7 - 2026-07-18 - Re-tuned on disjoint seeds, expanded to 20 targets
 
-**Run ID:**
-**Script:** `tune_hyperparams.py` (BASE_SEED changed from 42 to 100)
+**Commits:**
+- `fix(sa): restore missing return statement (file was truncated, causing NoneType error)` (0187f30)
+- `fix: rename n_gates to max_gates in SA, remove debug print` (a69b418)
+- `feat: add Optuna hyperparameter tuning for EA and SA` (30e299e, re-tuned on seeds 100-104)
+- `feat: update final EA/SA params from Optuna, N_TARGETS=20` (3888b95)
+- `chore: add Optuna study databases (disjoint seed tuning run)` (0ee44e3)
 
-**Why this run:** Entry 6's tuning seeds (42-46) overlapped with the
-reporting seeds (42-51). Re-tuning on seeds 100-104 removes this overlap.
+**Run ID:** `20260718_175554`
+**Script:** `run_experiments.py`
+**Config:** N_QUBITS=4, N_TARGETS=20 (up from 10), alpha=1.0, beta=0.01,
+EA: max_gates=15, pop_size=67, mutation_rate=0.0779 (Optuna-tuned, seeds 100-104),
+SA: max_gates=15, initial_temp=0.256, cooling_rate=0.9769 (Optuna-tuned, seeds 100-104)
 
-**Raw results:**
+**Why this run:** Entry 6's tuning had a train/test overlap (tuning seeds 42-46
+were a subset of the 10 reporting seeds 42-51). Re-tuned on a disjoint seed
+range (100-104) to remove this leakage, and expanded reporting from 10 to 20
+targets for a more robust sample. Also fixed an unrelated bug found in this
+process: `sa.py` had been accidentally truncated (missing its `return`
+statement entirely), causing a `NoneType` crash - unrelated to the tuning
+work, just discovered while editing the file for the `n_gates`->`max_gates`
+rename.
 
-**Your interpretation:**
+**Aggregated results (20 targets):**
 
-**Open question / next step:**
+| | EA | SA |
+|---|---|---|
+| Mean fidelity | 0.462 | 0.384 |
+| Mean gate count | 4.85 | 6.05 |
+| Gate count std | ~1.24 | ~3.19 |
+| Fidelity-per-gate | 0.095 | 0.064 |
+
+**Comparison to Entry 6 (overlapping-seed tuning, 10 targets):**
+
+| | EA (Entry 6) | EA (this entry) | SA (Entry 6) | SA (this entry) |
+|---|---|---|---|---|
+| Mean fidelity | 0.499 | 0.462 | 0.514 | 0.384 |
+
+**Important reversal:** in every prior entry (1, 4, 6), SA had higher raw
+fidelity than EA. Here - with the tuning/reporting overlap removed and a
+larger 20-target sample - **EA now clearly outperforms SA** on both fidelity
+(+20% relative) and fidelity-per-gate (+48% relative). Gate-count variance
+is also still much higher for SA (std ~3.19 vs EA's ~1.24), consistent with
+every earlier entry.
+
+Three possible explanations, not yet distinguished from each other:
+1. Larger sample (20 vs 10 targets) reduced noise that previously happened
+   to favor SA.
+2. Entry 6's SA tuning may have partly overfit to the overlapping seeds,
+   inflating SA's apparent performance in that specific comparison.
+3. EA's hyperparameter search may have simply had more genuine room to
+   improve than SA's - EA's best tuning-set fitness (0.386) was notably
+   higher than SA's (0.314) even during tuning itself, before this
+   full run happened.
+
+**Your interpretation (fill in):**
+- Which of the three explanations above (or combination) do you find most
+  plausible, and why? _______________
+- Does this change how you'd frame the EA vs. SA comparison in your
+  Discussion chapter - e.g., from "SA wins on fidelity but wastefully" to
+  something else? _______________
+- Is 20 targets/1 run each still enough, or does this reversal make the
+  case for repeated runs per target stronger than it was before? _______________
+
+**Open question / next step:** decide whether to also re-run the finer beta
+sweep (sweep_beta.py) with these newly re-tuned hyperparameters, for
+consistency with this entry, before moving fully into writing the
+Experiments chapter.
 
 ---
 
