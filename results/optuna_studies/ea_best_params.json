@@ -1,0 +1,8 @@
+{
+  "best_value": 0.38562870376253433,
+  "best_params": {
+    "pop_size": 67,
+    "mutation_rate": 0.07789684369904809
+  },
+  "n_trials": 32
+}

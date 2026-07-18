@@ -1,0 +1,8 @@
+{
+  "best_value": 0.3143987326982459,
+  "best_params": {
+    "initial_temp": 0.25603111630882125,
+    "cooling_rate": 0.9768535355244766
+  },
+  "n_trials": 30
+}
