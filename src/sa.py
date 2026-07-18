@@ -106,3 +106,14 @@ def simulated_annealing(
 
         temperature *= cooling_rate
         iteration += 1
+
+        if verbose and iteration % 500 == 0:
+            print(f"Iter {iteration:5d} | Temp: {temperature:.5f} | "
+                  f"Best fitness: {best_score:.4f} | Fidelity: {best_fidelity:.4f}")
+
+    return {
+        'best_circuit': best_circuit,
+        'best_fidelity': compute_fidelity(best_circuit, target_state, n_qubits),
+        'best_gate_count': compute_gate_count(best_circuit),
+        'history': history
+    }
