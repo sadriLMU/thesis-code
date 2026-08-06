@@ -1,7 +1,7 @@
 import numpy as np
 from qiskit.quantum_info import Statevector
 from circuit_utils import random_circuit, random_gate
-from fitness import fitness, compute_fidelity, compute_gate_count
+from fitness import fitness as default_fitness, compute_fidelity, compute_gate_count
 
 
 def initialize_population(pop_size: int, n_qubits: int, max_gates: int) -> list:
@@ -18,9 +18,19 @@ def initialize_population(pop_size: int, n_qubits: int, max_gates: int) -> list:
 
 
 def evaluate_population(population: list, target_state: Statevector,
-                         n_qubits: int, alpha: float, beta: float) -> list:
-    """Evaluate fitness for each individual in the population."""
-    return [fitness(ind, target_state, n_qubits, alpha, beta) for ind in population]
+                         n_qubits: int, alpha: float, beta: float,
+                         fitness_fn=None) -> list:
+    """
+    Evaluate fitness for each individual in the population.
+
+    fitness_fn: optional custom fitness function with signature
+                fitness_fn(gates, target_state, n_qubits, alpha, beta).
+                Defaults to the standard fitness() from fitness.py if not
+                given, e.g. to allow experimenting with fitness_with_floor()
+                without changing this module's default behavior.
+    """
+    fn = fitness_fn if fitness_fn is not None else default_fitness
+    return [fn(ind, target_state, n_qubits, alpha, beta) for ind in population]
 
 
 def selection(population: list, scores: list, n_select: int) -> list:
@@ -32,7 +42,7 @@ def selection(population: list, scores: list, n_select: int) -> list:
 def crossover(parent1: list, parent2: list) -> tuple:
     """
     Single-point crossover between two parent circuits.
-    Works with variable lengths — the crossover point is chosen
+    Works with variable lengths -- the crossover point is chosen
     within the shorter parent to avoid index errors.
     """
     if len(parent1) < 2 or len(parent2) < 2:
@@ -91,7 +101,8 @@ def evolutionary_algorithm(
     mutation_rate: float = 0.1,
     alpha: float = 1.0,
     beta: float = 0.01,
-    verbose: bool = True
+    verbose: bool = True,
+    fitness_fn=None,
 ) -> dict:
     """
     Run the Evolutionary Algorithm for quantum circuit synthesis.
@@ -100,6 +111,10 @@ def evolutionary_algorithm(
     - Start with a population of random circuits (variable length)
     - Each generation: evaluate, select best, crossover, mutate
     - Elitism: always keep the best individual unchanged
+
+    fitness_fn: optional custom fitness function (see evaluate_population).
+                Defaults to the standard alpha*fidelity - beta*gate_count
+                fitness from fitness.py.
 
     Returns:
         best_circuit:   list of gates
@@ -113,7 +128,8 @@ def evolutionary_algorithm(
 
     for gen in range(n_generations):
         # Step 2: Evaluate fitness of every circuit
-        scores = evaluate_population(population, target_state, n_qubits, alpha, beta)
+        scores = evaluate_population(population, target_state, n_qubits,
+                                      alpha, beta, fitness_fn=fitness_fn)
         best_idx = int(np.argmax(scores))
         best_individual = population[best_idx][:]
 
@@ -125,11 +141,11 @@ def evolutionary_algorithm(
             print(f"Gen {gen:4d} | Fidelity: {best_fidelity:.4f} | "
                   f"Gates: {compute_gate_count(best_individual)}")
 
-        # Step 3: Selection — keep top 50%
+        # Step 3: Selection -- keep top 50%
         n_select = pop_size // 2
         selected = selection(population, scores, n_select)
 
-        # Step 4: Crossover — fill population back to pop_size
+        # Step 4: Crossover -- fill population back to pop_size
         new_population = selected[:]
         while len(new_population) < pop_size:
             p1 = selected[np.random.randint(len(selected))]
@@ -142,11 +158,12 @@ def evolutionary_algorithm(
         population = [mutate(ind, n_qubits, max_gates, mutation_rate)
                       for ind in population]
 
-        # Step 6: Elitism — best individual always survives unchanged
+        # Step 6: Elitism -- best individual always survives unchanged
         population[0] = best_individual
 
     # Final evaluation
-    scores = evaluate_population(population, target_state, n_qubits, alpha, beta)
+    scores = evaluate_population(population, target_state, n_qubits,
+                                  alpha, beta, fitness_fn=fitness_fn)
     best_idx = int(np.argmax(scores))
     best_circuit = population[best_idx]
 

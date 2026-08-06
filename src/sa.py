@@ -1,7 +1,7 @@
 import numpy as np
 from qiskit.quantum_info import Statevector
 from circuit_utils import random_circuit, random_gate
-from fitness import fitness, compute_fidelity, compute_gate_count
+from fitness import fitness as default_fitness, compute_fidelity, compute_gate_count
 
 
 def neighbor(circuit: list, n_qubits: int, max_gates: int) -> list:
@@ -59,7 +59,8 @@ def simulated_annealing(
     max_iterations: int = 2000,
     alpha: float = 1.0,
     beta: float = 0.01,
-    verbose: bool = True
+    verbose: bool = True,
+    fitness_fn=None,
 ) -> dict:
     """
     Run Simulated Annealing for quantum circuit synthesis.
@@ -69,6 +70,12 @@ def simulated_annealing(
     (2) the hard cap that neighbor() enforces during the search, so the
     circuit can never grow past max_gates via repeated 'insert' moves.
 
+    fitness_fn: optional custom fitness function with signature
+                fitness_fn(gates, target_state, n_qubits, alpha, beta).
+                Defaults to the standard fitness() from fitness.py if not
+                given, e.g. to allow experimenting with fitness_with_floor()
+                without changing this module's default behavior.
+
     Returns a dict with:
         - best_circuit: list of gates
         - best_fidelity: float
@@ -76,9 +83,11 @@ def simulated_annealing(
         - history: list of best fidelity per iteration (pure fidelity,
                    matching ea.py's history -- not the penalized fitness score)
     """
+    fn = fitness_fn if fitness_fn is not None else default_fitness
+
     start_len = np.random.randint(1, max_gates + 1)
     current_circuit = random_circuit(n_qubits, start_len)
-    current_score = fitness(current_circuit, target_state, n_qubits, alpha, beta)
+    current_score = fn(current_circuit, target_state, n_qubits, alpha, beta)
 
     best_circuit = current_circuit[:]
     best_score = current_score
@@ -90,7 +99,7 @@ def simulated_annealing(
 
     while temperature > min_temp and iteration < max_iterations:
         new_circuit = neighbor(current_circuit, n_qubits, max_gates=max_gates)
-        new_score = fitness(new_circuit, target_state, n_qubits, alpha, beta)
+        new_score = fn(new_circuit, target_state, n_qubits, alpha, beta)
 
         ap = acceptance_probability(current_score, new_score, temperature)
         if np.random.random() < ap:
