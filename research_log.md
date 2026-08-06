@@ -545,3 +545,82 @@ runs) would take many hours - a reduced-scope version (fewer beta values
 and/or fewer targets, still repeated) may be a more realistic compromise.
 
 ---
+
+## Entry 11 - 2026-08-06 - Repeated floor comparison confirms EA benefit, reveals SA instability
+
+**Run ID:** `20260806_225432_beta_floor_repeated`
+**Script:** `sweep_beta_floor_repeated.py`
+**Config:** N_QUBITS=4, N_TARGETS=20 (seeds 42-61), N_REPEATS=3, beta in
+{0.03, 0.07, 0.15} (reduced from Entry 10's 5 values), same fitness variants
+as Entry 10 (standard vs. floor, min_fidelity=0.3, floor_penalty=-100),
+same Optuna-tuned hyperparameters. 60 samples per (beta, algorithm,
+variant) cell (20 targets x 3 repeats).
+
+**Why this run:** Entry 10's single-run floor comparison showed a clean
+benefit for EA but a genuinely mixed result for SA (floor better at some
+beta, worse at others). Given that Entry 5's apparent "SA efficiency
+crossover" turned out to be single-run noise once properly tested, this
+repeats the comparison (reduced scope: 3 beta values, 3 repeats, to keep
+runtime manageable) to check whether SA's inconsistency is real.
+
+**Results (mean +/- std across 60 samples per cell):**
+
+| beta | EA standard | EA floor | SA standard | SA floor |
+|---|---|---|---|---|
+| 0.03 | 0.421 +/- 0.114 | 0.408 +/- 0.132 | 0.327 +/- 0.107 | 0.220 +/- 0.205 |
+| 0.07 | 0.320 +/- 0.128 | 0.380 +/- 0.130 | 0.259 +/- 0.108 | 0.206 +/- 0.189 |
+| 0.15 | 0.207 +/- 0.099 | 0.358 +/- 0.107 | 0.194 +/- 0.097 | 0.195 +/- 0.177 |
+
+**EA finding confirmed:** the floor's benefit for EA at beta=0.07 and 0.15
+replicates Entry 10 closely (floor beats standard at both, with the
+beta=0.03 exception -- standard slightly ahead there too -- also holding
+up). This was not a single-run fluke.
+
+**SA finding reinterpreted, not simply confirmed or denied:** SA's mean
+fidelity under the floor is lower than standard at every beta tested, same
+direction as Entry 10 -- but the real story is in the standard deviation.
+SA-floor's std (0.177-0.205) is nearly as large as its own mean, and roughly
+2x larger than SA-standard's std (0.097-0.108) at the same beta values, and
+also larger than EA-floor's std (0.107-0.132) at the same betas. This means
+SA under the floor constraint does not consistently underperform by a
+moderate amount -- it is highly bimodal: some runs clear the fidelity floor
+and score reasonably, others fail to find anything above 0.3 within the
+iteration budget and are dominated by near-penalty scores. Entry 10's
+single run per condition happened to land in a way that looked like a
+consistent (if modest) SA disadvantage, but the repeated data shows the
+real phenomenon is instability, not a moderate, reliable underperformance.
+
+**Plausible mechanism:** SA explores via a single search trajectory, so
+whether it happens to wander into fidelity >= 0.3 territory before
+exhausting its iteration budget is highly sensitive to that one trajectory's
+luck. EA's population-based search has many parallel lineages (pop_size=67)
+each generation; if even one clears the floor, the whole population
+benefits via elitism/selection. This gives EA much more consistent access
+to floor-clearing circuits than SA's single walk.
+
+**Gate-count cost confirmed as substantial for both, larger for SA:** EA's
+floor gate count (3.53-4.52) is roughly double standard (1.17-3.43); SA's
+floor gate count (6.47-6.95) is far higher still, several times standard
+(1.22-3.83) -- consistent with Entry 10.
+
+**Your interpretation (fill in):**
+- Does the "SA becomes bimodal/unstable under a hard constraint" framing
+  make more sense to you than "SA does worse with the floor" as a
+  description of what's happening, given the std values above? _______________
+- Is this instability itself a meaningful finding for the thesis (i.e.,
+  hard constraints interact badly with single-trajectory search), separate
+  from whether the floor is ultimately adopted as the reported fitness
+  function? _______________
+- Given EA's clear, replicated benefit and SA's instability under the
+  floor, would you recommend the floor as the main reported fitness
+  function, or present it as a secondary experiment/ablation alongside the
+  standard results? _______________
+
+**Open question / next step:** decide with Leo on Monday whether the floor
+variant should become the primary reported fitness function (replacing
+beta as previously used) or stay as a secondary ablation study documenting
+this instability finding. If adopted as primary, the full main comparison
+(Entry 9) and beta sweep (Entry 8) would need to be re-run under the floor
+variant for consistency.
+
+---
