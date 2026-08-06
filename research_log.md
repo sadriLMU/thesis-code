@@ -468,3 +468,80 @@ repeated version of the beta sweep (Entry 8) for the same level of
 confidence, time permitting.
 
 ---
+## Entry 10 - 2026-08-05 - Minimum-fidelity floor experiment (Leo's suggestion)
+
+**Run ID:** `20260805_233144_beta_floor`
+**Script:** `sweep_beta_floor.py`
+**Config:** N_QUBITS=4, N_TARGETS=20 (seeds 42-61), beta in {0.03, 0.05, 0.07,
+0.10, 0.15} (the range where Entry 8 showed fidelity collapse), Optuna-tuned
+hyperparameters (same as Entry 7/8/9). Two fitness variants compared:
+"standard" (alpha*fidelity - beta*gate_count, no floor) and "floor" (same
+formula, but a hard penalty of -100 if fidelity < min_fidelity=0.3),
+following the same pattern as Suenkel et al.'s QCO fitness (Related Work).
+Single run per (beta, algorithm, variant, target) - not yet repeated.
+
+**Why this run:** Leo's meeting feedback suggested avoiding beta values so
+strong that fidelity collapses, possibly by adding a minimum-fidelity
+constraint. Implemented as a new fitness_with_floor() function in
+fitness.py (fitness() itself unchanged, so all previously reported results
+remain valid and unaffected - this only affects experiments that explicitly
+opt into the new fitness_fn parameter).
+
+**Aggregated results (mean across 20 targets):**
+
+| beta | EA standard fid/gates | EA floor fid/gates | SA standard fid/gates | SA floor fid/gates |
+|---|---|---|---|---|
+| 0.03 | 0.427 / 3.20 | 0.399 / 4.90 | 0.305 / 3.45 | 0.263 / 7.10 |
+| 0.05 | 0.350 / 2.50 | 0.392 / 4.50 | 0.276 / 2.55 | 0.261 / 6.95 |
+| 0.07 | 0.276 / 1.70 | 0.376 / 4.35 | 0.271 / 1.95 | 0.248 / 6.70 |
+| 0.10 | 0.238 / 1.40 | 0.340 / 4.10 | 0.228 / 1.40 | 0.235 / 6.55 |
+| 0.15 | 0.235 / 1.30 | 0.336 / 3.95 | 0.197 / 1.15 | 0.235 / 6.55 |
+
+**Key finding - the floor helps EA clearly, but SA inconsistently:**
+
+For EA, the floor variant beats standard at every beta >= 0.05, with the
+gap widening sharply at high beta (beta=0.15: 0.336 vs. 0.235 - the floor
+essentially prevents the collapse seen in Entry 8). The one exception is
+beta=0.03, where standard slightly beats floor (0.427 vs. 0.399) - plausibly
+because the penalty is too gentle there for collapse to be a problem in the
+first place, so the floor only adds constraint without benefit.
+
+For SA, the floor is actually worse than standard at low/moderate beta
+(0.03: 0.263 vs. 0.305; 0.05: 0.261 vs. 0.276), and only edges out standard
+at the two highest beta values tested (0.10: 0.235 vs. 0.228; 0.15: 0.235
+vs. 0.197) - and even then only modestly.
+
+**Cost of the floor:** substantial for both algorithms. EA's gate count
+roughly doubles to triples under the floor (1.3-3.2 -> 3.95-4.9 gates). SA's
+gate count increases even more dramatically (1.15-3.45 -> 6.55-7.10 gates) -
+SA has to build much longer circuits to reliably clear the fidelity
+threshold at all.
+
+**Caveat - single run per condition:** like Entry 8's original beta sweep,
+this used one run per (beta, algorithm, variant, target) combination, not
+repeated. Given SA's result is genuinely mixed (helps at some beta values,
+hurts at others), and given that Entry 5's apparent "SA efficiency
+crossover" turned out to be noise/an artifact once properly tested (Entry
+8), this SA inconsistency should be treated with real caution until
+confirmed by repeated runs - it could be a genuine property of SA's search
+process, or it could be single-run noise the way the earlier crossover was.
+
+**Your interpretation (fill in):**
+- Does it make intuitive sense that a population-based search (EA) would
+  clear a hard fidelity threshold more reliably than a single-trajectory
+  search (SA)? _______________
+- Is the roughly doubled/tripled gate-count cost an acceptable trade-off
+  for avoiding fidelity collapse, or does it undermine the whole point of
+  having a beta penalty in the first place? _______________
+- Given SA's inconsistent result, would you present this experiment to Leo
+  as "floor works, with a caveat for SA" or hold off until repeated runs
+  confirm the SA finding either way? _______________
+
+**Open question / next step:** decide whether to run a repeated version of
+this experiment (multiple runs per beta/variant/target combination) before
+presenting to Leo on Monday, given time available. Full 5x repeat at this
+scale (5 beta x 20 targets x 2 variants x 2 algorithms x 5 repeats = 2000
+runs) would take many hours - a reduced-scope version (fewer beta values
+and/or fewer targets, still repeated) may be a more realistic compromise.
+
+---
