@@ -624,3 +624,48 @@ this instability finding. If adopted as primary, the full main comparison
 variant for consistency.
 
 ---
+
+**UPDATE 2026-08-06 - Full 5-beta-value replication confirms both findings:**
+
+**Run ID:** `20260806_233154_beta_floor_repeated`
+**Config:** identical to above, but all 5 of Entry 10's original beta values
+(0.03, 0.05, 0.07, 0.10, 0.15) instead of the reduced 3-value subset,
+1200 total runs (5 beta x 20 targets x 2 variants x 2 algorithms x 3 repeats).
+
+**Full results (mean +/- std across 60 samples per cell):**
+
+| beta | EA standard | EA floor | SA standard | SA floor |
+|---|---|---|---|---|
+| 0.03 | 0.421 +/- 0.114 | 0.408 +/- 0.132 | 0.327 +/- 0.107 | 0.220 +/- 0.205 |
+| 0.05 | 0.373 +/- 0.127 | 0.392 +/- 0.127 | 0.303 +/- 0.102 | 0.210 +/- 0.194 |
+| 0.07 | 0.320 +/- 0.128 | 0.380 +/- 0.130 | 0.259 +/- 0.108 | 0.206 +/- 0.189 |
+| 0.10 | 0.263 +/- 0.115 | 0.365 +/- 0.110 | 0.231 +/- 0.108 | 0.199 +/- 0.182 |
+| 0.15 | 0.207 +/- 0.099 | 0.358 +/- 0.107 | 0.194 +/- 0.097 | 0.195 +/- 0.177 |
+
+**EA finding, now fully confirmed across all 5 points:** floor beats
+standard at every beta >= 0.05, with a smooth, monotonic widening gap as
+beta increases (standard collapses 0.421 -> 0.207; floor stays nearly flat,
+0.408 -> 0.358). Only beta=0.03 favors standard, consistent with the
+"nothing to protect against yet" explanation given above.
+
+**SA instability finding, now fully confirmed across all 5 points:**
+SA-floor's std (0.177-0.205) is consistently roughly 2x SA-standard's
+(0.097-0.108) at every beta tested, not just the 3 points from the earlier
+reduced run. This is now a five-point, fully consistent pattern rather than
+a partial signal -- the strongest evidence yet that SA's instability under
+the floor constraint is a genuine, robust property of the search, not
+coincidental to which beta values were tested.
+
+**Cross-check against the earlier 3-value run:** values at beta=0.03/0.07/0.15
+match this run almost exactly (e.g. EA floor at beta=0.07: 0.380 in both
+runs), confirming the reduced-scope run was not itself a fluke.
+
+**Conclusion for Monday:** both findings from this section are now on solid,
+fully-replicated footing across the entire originally-tested beta range:
+(1) the fidelity floor reliably prevents EA's fidelity collapse at high
+beta, at a roughly 2-3x gate-count cost; (2) the same floor makes SA's
+outcome highly bimodal/unpredictable rather than moderately worse, likely
+due to SA's single-trajectory search having no redundancy against failing
+to clear the threshold within its iteration budget.
+
+---

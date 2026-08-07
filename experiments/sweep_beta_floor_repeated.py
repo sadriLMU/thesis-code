@@ -1,23 +1,26 @@
 """
 sweep_beta_floor_repeated.py
 
-Reduced-scope, repeated version of sweep_beta_floor.py (Entry 10). The
-single-run floor comparison showed a clean, consistent benefit for EA, but
-a genuinely mixed result for SA (floor sometimes better, sometimes worse
-than standard fitness). Given Entry 5's "SA efficiency crossover" turned
-out to be single-run noise once properly tested, this repeats the
-comparison at a reduced scope to check whether SA's inconsistency is real
-or another single-run artifact, without the multi-hour runtime of a full
-5x-repeat over all 5 beta values.
+Repeated version of sweep_beta_floor.py (Entry 10), covering all 5 of
+Entry 10's original beta values. The single-run floor comparison showed a
+clean, consistent benefit for EA, but a genuinely mixed result for SA
+(floor sometimes better, sometimes worse than standard fitness). Given
+Entry 5's "SA efficiency crossover" turned out to be single-run noise once
+properly tested, this repeats the full comparison to check whether SA's
+inconsistency is real or another single-run artifact.
 
-Scope reduction from the original sweep_beta_floor.py:
-  - 3 beta values instead of 5 (0.03, 0.07, 0.15 -- start, middle, extreme
-    of the originally tested range, enough to see the trend)
-  - 3 repeats per (beta, algorithm, variant, target) instead of 1
+(This originally ran as a reduced 3-beta-value version, given the expected
+multi-hour runtime for a full 5x repeat -- but actual per-run time turned
+out much faster than estimated, so this now covers all 5 beta values from
+Entry 10 rather than a subset, for a complete replication.)
+
+Configuration:
+  - 5 beta values (0.03, 0.05, 0.07, 0.10, 0.15), same as Entry 10
+  - 3 repeats per (beta, algorithm, variant, target)
   - Same 20 target states, same fitness variants (standard vs. floor)
 
-Total runs: 3 beta x 20 targets x 2 variants x 2 algorithms x 3 repeats
-          = 720 runs (vs. 2000 for a full 5x repeat over all 5 beta values)
+Total runs: 5 beta x 20 targets x 2 variants x 2 algorithms x 3 repeats
+          = 1200 runs
 
 Output:
   - results/runs/<run_id>/floor_comparison_repeated.csv : one row per
@@ -59,7 +62,8 @@ BASE_SEED = 42
 N_REPEATS = 3
 
 ALPHA = 1.0
-BETA_VALUES = [0.03, 0.07, 0.15]  # reduced from the original 5-value sweep
+BETA_VALUES = [0.03, 0.05, 0.07, 0.10, 0.15]  # full replication of Entry 10's
+                                                # 5-value sweep, now repeated
 
 MIN_FIDELITY = 0.3
 FLOOR_PENALTY = -100.0
