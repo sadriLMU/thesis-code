@@ -1,3 +1,21 @@
+"""
+test_sa.py
+
+Quick manual sanity check: runs SA once with default-ish parameters and
+prints the result. Not a formal test suite (no assertions, no pytest) --
+just a fast way to confirm the SA pipeline runs end-to-end without errors
+after making code changes. For the actual reported results, see
+experiments/run_experiments*.py instead.
+
+Note: uses default initial_temp/cooling_rate (not the Optuna-tuned values
+used in the reported experiments) -- this script only checks that the
+code runs, not that it reproduces any specific reported number.
+
+Usage:
+    cd thesis-code
+    python test_sa.py
+"""
+
 import sys
 sys.path.insert(0, 'src')
 

@@ -1,18 +1,26 @@
 """
 sweep_beta.py
 
-Tests the hypothesis raised after the first EA/SA comparison run:
-"SA's gate count grows largely unchecked because beta=0.01 is too weak
-relative to the fidelity term, while EA's elitism+crossover structure
-regularizes circuit length mostly independently of beta."
+Beta (gate-count penalty weight) sensitivity sweep: runs EA and SA once
+per (target, beta) combination across a range of beta values, to study
+the fidelity/gate-count trade-off (thesis Section 5.3, "Beta Sensitivity").
 
-For a range of beta values, this script runs both EA and SA on the same
-N_TARGETS Haar-random states (same seeds across beta values, so results
-are directly comparable) and records fidelity + gate count. Output:
+Single run per (target, beta) -- treated as a preliminary result in the
+thesis text (see research_log.md Entry 8). The finer beta resolution
+(0.01-0.07) was chosen after an earlier, coarser sweep (0.01-0.4) showed
+saturation above beta=0.1 -- see research_log.md Entry 2.
+
+Note: an early hypothesis considered whether EA's population structure
+regularizes circuit length independently of beta while SA's doesn't; this
+was later refined by Entry 8, which found EA consistently outperforms SA
+across the entire tested beta range (in both fidelity and gate-count
+efficiency), not just at the extremes.
+
+Output:
   - results/runs/<run_id>/sweep_results.csv   : one row per (beta, algorithm, target)
   - results/runs/<run_id>/config.json         : parameters used, for reproducibility
-  - results/runs/<run_id>/gate_count_vs_beta.png : the plot that tests the hypothesis
-  - results/runs/<run_id>/fidelity_vs_beta.png   : the fidelity cost of larger beta
+  - results/runs/<run_id>/gate_count_vs_beta.png
+  - results/runs/<run_id>/fidelity_vs_beta.png
 
 Usage:
     cd thesis-code
@@ -40,29 +48,33 @@ from sa import simulated_annealing
 # Configuration
 # ---------------------------------------------------------------------------
 N_QUBITS = 4
-N_TARGETS = 20          # matches Entry 7's expanded sample (was 10)
+N_TARGETS = 20            # matches the main comparison's sample size (see
+                           # run_experiments.py)
 BASE_SEED = 42
 
 ALPHA = 1.0
-BETA_VALUES = [0.01, 0.02, 0.03, 0.05, 0.07]   # finer resolution to find the
-                                                 # saturation transition point;
-                                                 # 0.1/0.2/0.4 already confirmed
-                                                 # redundant in the first sweep
+BETA_VALUES = [0.01, 0.02, 0.03, 0.05, 0.07]   # finer resolution around
+                                                 # the transition point;
+                                                 # 0.1/0.2/0.4 already
+                                                 # confirmed redundant in
+                                                 # an earlier, coarser sweep
 
-# EA/SA parameters held fixed across the sweep (only beta changes)
+# EA/SA parameters held fixed across the sweep -- only beta changes.
+# Optuna-tuned on disjoint seeds 100-104 (see research_log.md Entry 7 and
+# results/optuna_studies/).
 EA_FIXED_PARAMS = dict(
     max_gates=15,
-    pop_size=67,          # Optuna-tuned (disjoint seeds 100-104) -- see Entry 7
+    pop_size=67,
     n_generations=100,
-    mutation_rate=0.0779,  # Optuna-tuned (disjoint seeds 100-104)
+    mutation_rate=0.0779,
     alpha=ALPHA,
     verbose=False,
 )
 
 SA_FIXED_PARAMS = dict(
     max_gates=15,
-    initial_temp=0.256,   # Optuna-tuned (disjoint seeds 100-104) -- see Entry 7
-    cooling_rate=0.9769,  # Optuna-tuned (disjoint seeds 100-104)
+    initial_temp=0.256,
+    cooling_rate=0.9769,
     min_temp=1e-4,
     max_iterations=2000,
     alpha=ALPHA,
@@ -83,11 +95,12 @@ os.makedirs(RUN_DIR, exist_ok=True)
 # ---------------------------------------------------------------------------
 def run_sweep():
     """
-    For each beta value, runs EA and SA on N_TARGETS target states
-    (same seeds reused across beta values -> same targets each time,
-    only the penalty weight changes).
+    For each beta value, runs EA and SA on N_TARGETS target states (same
+    seeds reused across beta values, so only the penalty weight changes
+    between comparisons).
 
-    Returns a flat list of row-dicts, one per (beta, algorithm, target).
+    Returns:
+        A flat list of row-dicts, one per (beta, algorithm, target).
     """
     rows = []
 
@@ -139,6 +152,7 @@ def run_sweep():
 # Output: CSV
 # ---------------------------------------------------------------------------
 def save_csv(rows, path):
+    """Writes one row per (beta, algorithm, target) to sweep_results.csv."""
     fieldnames = ["beta", "target_idx", "seed", "algorithm", "fidelity", "gate_count"]
     with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -148,6 +162,7 @@ def save_csv(rows, path):
 
 
 def save_config(path):
+    """Snapshots every parameter used for this run, for reproducibility."""
     config = {
         "run_id": RUN_ID,
         "n_qubits": N_QUBITS,
@@ -168,8 +183,8 @@ def save_config(path):
 # ---------------------------------------------------------------------------
 def plot_metric_vs_beta(rows, metric, ylabel, title, path):
     """
-    Generic plotting helper: mean +/- std of `metric` (e.g. "gate_count" or
-    "fidelity") as a function of beta, one line per algorithm.
+    Plots mean +/- std of `metric` (e.g. "gate_count" or "fidelity") as a
+    function of beta, with one line per algorithm.
     """
     fig, ax = plt.subplots(figsize=(7, 5))
 
@@ -207,12 +222,12 @@ if __name__ == "__main__":
 
     plot_metric_vs_beta(
         rows, metric="gate_count", ylabel="Best gate count",
-        title="Gate count vs. beta (tests the SA-regularization hypothesis)",
+        title="Gate count vs. beta",
         path=os.path.join(RUN_DIR, "gate_count_vs_beta.png"),
     )
     plot_metric_vs_beta(
         rows, metric="fidelity", ylabel="Best fidelity",
-        title="Fidelity cost of increasing beta",
+        title="Fidelity vs. beta",
         path=os.path.join(RUN_DIR, "fidelity_vs_beta.png"),
     )
 

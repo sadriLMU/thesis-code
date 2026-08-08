@@ -5,9 +5,16 @@ The circuit diagram from plot_circuits.py cannot unambiguously show where
 crossover() split the two parents, because Qiskit's drawer groups gates by
 qubit wire, not by their true position in the underlying gate list -- two
 different splice points can look identical in the diagram. This script
-resolves that by printing the actual gate list, gate by gate, labelled with
-which parent it came from and its index -- a direct, unambiguous check of
-what crossover() actually did, independent of any drawing/rendering step.
+resolves that by printing the actual gate list, gate by gate, labelled
+with which parent it came from and its index -- a direct, unambiguous
+check of what crossover() actually did, independent of any drawing/
+rendering step.
+
+Confirms crossover() is a correct single-point split: child1 matches
+parent1 up to the split point, then matches parent2 from that point
+onward, switching exactly once (verified for the seed=456 example used in
+plot_circuits.py -- see thesis Section 4.3.3 / Figure showing
+ea_crossover_parent1/parent2/child.png).
 
 Usage:
     cd thesis-code
@@ -27,7 +34,10 @@ from ea import crossover
 
 
 def gate_str(gate: dict) -> str:
-    """Short human-readable description of one gate dict."""
+    """
+    Short human-readable description of one gate dict, e.g.
+    "RX(q1, angle=3.58)" or "CX(control=q0, target=q2)".
+    """
     if gate["gate"] in ("rx", "ry", "rz"):
         return f"{gate['gate'].upper()}(q{gate['qubit']}, angle={gate['angle']:.2f})"
     elif gate["gate"] == "cx":
@@ -37,6 +47,7 @@ def gate_str(gate: dict) -> str:
 
 
 def print_labelled(circuit: list, label: str):
+    """Prints a circuit's gates, one per line, prefixed by their index."""
     print(f"\n{label} ({len(circuit)} gates):")
     for i, gate in enumerate(circuit):
         print(f"  [{i}] {gate_str(gate)}")

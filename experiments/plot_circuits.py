@@ -1,18 +1,22 @@
 """
 plot_circuits.py
 
-Generates visual circuit diagrams for the thesis, addressing Leo's feedback
-that results should be shown concretely (actual circuits), not just numbers:
-  - The best circuit found by EA and by SA for a chosen target state.
-  - An example of SA's neighbor() operation: a circuit before and after one
-    neighbor step, so the reader can see concretely what "replace/insert/
-    delete a gate" looks like.
-  - An example of EA's crossover: two parent circuits and the resulting
-    child, so the reader can see concretely how single-point crossover
-    combines two circuits.
+Generates visual circuit diagrams for the thesis, addressing Leo's
+feedback that results should be shown concretely (actual circuits), not
+just numbers. Produces the figures used in thesis Section 5.2 and
+Chapter 4 (illustrating EA's crossover and SA's neighbor() operator).
 
-Uses Qiskit's built-in circuit drawer (matplotlib backend) to render each
-circuit as an image.
+Generates:
+  - The best circuit found by EA and by SA for a chosen target state
+    (Target 1, seed 42, matching the numbers reported throughout Chapter 5).
+  - An example of SA's neighbor() operation: a circuit before and after
+    one step, so the reader can see concretely what "replace/insert/
+    delete a gate" looks like (see verify_crossover.py for the analogous,
+    rigorous verification of crossover()).
+  - An example of EA's crossover: two parent circuits and the resulting
+    child.
+
+Uses Qiskit's built-in circuit drawer (matplotlib backend).
 
 Output (all in results/figures/):
   - best_circuit_ea.png
@@ -81,6 +85,20 @@ os.makedirs(FIGURES_DIR, exist_ok=True)
 def save_circuit_diagram(gates, title, filename):
     """
     Builds a Qiskit circuit from a gate-dict list and saves a diagram.
+
+    Note: `title` is descriptive metadata used in the console log and
+    (attempted) as the circuit's name; Qiskit's mpl drawer does not
+    render circuit.name as visible text in the output image by default,
+    so `title` is currently NOT visible in the saved PNG itself -- only
+    in this function's console output and via the filename. This is
+    sufficient given each figure is embedded with a LaTeX \\caption{} in
+    the thesis; not fixed here to avoid regenerating already-reviewed
+    figures unnecessarily close to submission.
+
+    Args:
+        gates: Ordered list of gate dictionaries to draw.
+        title: Descriptive label, printed to console (see note above).
+        filename: Output filename, saved under results/figures/.
     """
     qc = build_circuit(N_QUBITS, gates)
     qc.name = title

@@ -9,6 +9,13 @@ Entry 5's "SA efficiency crossover" turned out to be single-run noise once
 properly tested, this repeats the full comparison to check whether SA's
 inconsistency is real or another single-run artifact.
 
+Result (research_log.md Entry 11): EA's benefit under the floor is
+confirmed and consistent. SA's mixed single-run result turns out to be
+explained by high variance, not a moderate reliable disadvantage --
+SA-floor's std is roughly 2x SA-standard's at every beta tested, i.e. SA
+under a hard fidelity constraint becomes unpredictable (sometimes clears
+the threshold, sometimes doesn't) rather than uniformly worse.
+
 (This originally ran as a reduced 3-beta-value version, given the expected
 multi-hour runtime for a full 5x repeat -- but actual per-run time turned
 out much faster than estimated, so this now covers all 5 beta values from
@@ -99,6 +106,7 @@ os.makedirs(RUN_DIR, exist_ok=True)
 
 
 def make_floor_fn():
+    """Returns a fitness_fn closure using the module-level floor settings."""
     return lambda g, t, n, a, b: fitness_with_floor(
         g, t, n, a, b, min_fidelity=MIN_FIDELITY, floor_penalty=FLOOR_PENALTY)
 
@@ -107,6 +115,14 @@ def make_floor_fn():
 # Sweep loop
 # ---------------------------------------------------------------------------
 def run_sweep():
+    """
+    For each beta value, target state, and repeat, runs EA and SA once
+    with each fitness variant (standard vs. floor).
+
+    Returns:
+        A flat list of row-dicts, one per
+        (beta, algorithm, variant, target, repeat).
+    """
     rows = []
 
     for beta in BETA_VALUES:
@@ -160,6 +176,7 @@ def run_sweep():
 # Output
 # ---------------------------------------------------------------------------
 def save_raw_csv(rows, path):
+    """Writes one row per (beta, algorithm, variant, target, repeat)."""
     fieldnames = ["beta", "target_idx", "target_seed", "repeat", "repeat_seed",
                   "algorithm", "fitness_variant", "fidelity", "gate_count"]
     with open(path, "w", newline="") as f:
@@ -170,6 +187,10 @@ def save_raw_csv(rows, path):
 
 
 def save_summary_csv(rows, path):
+    """
+    Aggregates raw rows into mean/std per (beta, algorithm, variant),
+    across all targets and repeats (n_samples = N_TARGETS * N_REPEATS).
+    """
     summary_rows = []
     for beta in BETA_VALUES:
         for algo in ("EA", "SA"):
@@ -196,6 +217,7 @@ def save_summary_csv(rows, path):
 
 
 def save_config(path):
+    """Snapshots every parameter used for this run, for reproducibility."""
     config = {
         "run_id": RUN_ID, "n_qubits": N_QUBITS, "n_targets": N_TARGETS,
         "base_seed": BASE_SEED, "n_repeats": N_REPEATS, "alpha": ALPHA,
@@ -209,6 +231,11 @@ def save_config(path):
 
 
 def plot_comparison(summary_rows, path):
+    """
+    Plots mean fidelity vs. beta with error bars (std across
+    targets+repeats), standard vs. floor variant, one subplot per
+    algorithm.
+    """
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
 
     for ax, algo in zip(axes, ("EA", "SA")):
@@ -221,7 +248,9 @@ def plot_comparison(summary_rows, path):
                            and r["fitness_variant"] == variant)
                 means.append(row["mean_fidelity"])
                 stds.append(row["std_fidelity"])
-            ax.errorbar(BETA_VALUES, means, yerr=stds, fmt=style[0] + "o",
+            # fmt="o" -- marker only; the line style is set via linestyle
+            # below, so the two aren't specified redundantly/conflictingly.
+            ax.errorbar(BETA_VALUES, means, yerr=stds, fmt="o",
                         linestyle=style, color=color, label=variant,
                         capsize=4)
         ax.set_xlabel("beta")

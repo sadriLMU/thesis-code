@@ -1,3 +1,17 @@
+"""
+test_ea.py
+
+Quick manual sanity check: runs EA once with default-ish parameters and
+prints the result. Not a formal test suite (no assertions, no pytest) --
+just a fast way to confirm the EA pipeline runs end-to-end without errors
+after making code changes. For the actual reported results, see
+experiments/run_experiments*.py instead.
+
+Usage:
+    cd thesis-code
+    python test_ea.py
+"""
+
 import sys
 sys.path.insert(0, 'src')
 

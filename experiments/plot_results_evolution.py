@@ -8,12 +8,17 @@ and SA's trend as a separate curve.
 
 This is NOT meant for the thesis body itself (Leo's guidance was to keep
 the debugging process out of the main narrative) -- this is a supporting
-set of charts for your own understanding and for meeting/presentation use,
-e.g. an appendix figure or backup slide if asked "how did the numbers
-change over the course of the project."
+set of charts for the author's own understanding and for meeting/
+presentation use, e.g. an appendix figure or backup slide if asked "how
+did the numbers change over the course of the project."
 
 All values below are taken directly from research_log.md; if you add more
-corrected entries later, update the STAGES list accordingly.
+corrected entries later, update the STAGES list accordingly. Note: the
+Entry 9 values here are from the original 5-repeat run; the 8-repeat
+extension (research_log.md Entry 9 update, 2026-08-08) and the Entry
+10/11 fidelity-floor experiments are not yet reflected in this chart, by
+design scope (this chart covers the main-comparison trend only, not the
+separate floor ablation study).
 
 Output (in results/figures/):
   - fidelity_evolution.png : EA vs. SA mean fidelity across stages
@@ -48,6 +53,10 @@ STAGES = [
 
 
 def plot_metric(values_ea, values_sa, ylabel, title, filename, fmt="{:.3f}"):
+    """
+    Plots EA and SA trends for one metric across all STAGES, with each
+    stage's value annotated directly on the chart.
+    """
     labels = [s[0] for s in STAGES]
     x = range(len(labels))
 

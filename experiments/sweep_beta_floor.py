@@ -1,22 +1,28 @@
 """
 sweep_beta_floor.py
 
-Tests Leo's suggestion: does adding a minimum-fidelity floor to the fitness
-function prevent the fidelity collapse seen at high beta in Entry 8
-(sweep_beta.py), where beta=0.07 drove EA/SA fidelity down to ~0.27?
+Ablation study testing Leo's suggestion from the week-2 meeting: does
+adding a minimum-fidelity floor to the fitness function prevent the
+fidelity collapse seen at high beta in sweep_beta.py (research_log.md
+Entry 8, where beta=0.07 drove EA/SA fidelity down to ~0.27)?
 
-For a range of beta values (focused on the higher end, where the collapse
-was observed), runs EA and SA twice: once with the standard fitness()
+Runs EA and SA twice at each beta value: once with the standard fitness()
 (alpha*fidelity - beta*gate_count, no floor), and once with
-fitness_with_floor() (same formula, but a hard penalty below min_fidelity).
-Compares mean fidelity and mean gate count between the two variants at each
-beta value.
+fitness_with_floor() (same formula, but a hard penalty below
+min_fidelity) -- see fitness.py for both definitions.
+
+Single run per (beta, algorithm, variant, target). For the repeated
+version used to confirm these findings, see
+sweep_beta_floor_repeated.py -- the single-run result here showed a
+mixed/inconsistent effect for SA that the repeated version clarified as
+high variance rather than a moderate, reliable disadvantage (see
+research_log.md Entries 10-11).
 
 Output:
   - results/runs/<run_id>/floor_comparison.csv : one row per
     (beta, algorithm, fitness_variant, target)
-  - results/figures/beta_floor_comparison.png : fidelity vs. beta, standard
-    vs. floor variant, for both algorithms
+  - results/figures/beta_floor_comparison.png : fidelity vs. beta,
+    standard vs. floor variant, for both algorithms
 
 Usage:
     cd thesis-code
@@ -92,6 +98,13 @@ os.makedirs(RUN_DIR, exist_ok=True)
 # Sweep loop
 # ---------------------------------------------------------------------------
 def run_sweep():
+    """
+    For each beta value and each fitness variant (standard vs. floor),
+    runs EA and SA once per target state.
+
+    Returns:
+        A flat list of row-dicts, one per (beta, algorithm, variant, target).
+    """
     rows = []
 
     for beta in BETA_VALUES:
@@ -145,6 +158,7 @@ def run_sweep():
 # Output
 # ---------------------------------------------------------------------------
 def save_csv(rows, path):
+    """Writes one row per (beta, algorithm, variant, target) to CSV."""
     fieldnames = ["beta", "target_idx", "seed", "algorithm", "fitness_variant",
                   "fidelity", "gate_count"]
     with open(path, "w", newline="") as f:
@@ -155,6 +169,7 @@ def save_csv(rows, path):
 
 
 def save_config(path):
+    """Snapshots every parameter used for this run, for reproducibility."""
     config = {
         "run_id": RUN_ID, "n_qubits": N_QUBITS, "n_targets": N_TARGETS,
         "base_seed": BASE_SEED, "alpha": ALPHA, "beta_values": BETA_VALUES,
@@ -167,6 +182,10 @@ def save_config(path):
 
 
 def plot_comparison(rows, path):
+    """
+    Plots mean fidelity vs. beta, standard vs. floor variant, in two
+    subplots (one per algorithm), for a direct visual comparison.
+    """
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
 
     for ax, algo in zip(axes, ("EA", "SA")):
