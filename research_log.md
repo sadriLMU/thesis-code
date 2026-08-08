@@ -467,6 +467,23 @@ rather than the single-run numbers from Entry 7/8. Consider also running a
 repeated version of the beta sweep (Entry 8) for the same level of
 confidence, time permitting.
 
+**UPDATE 2026-08-08 - Extended to 8 repeats, confirms result holds at larger sample:**
+
+**Run ID:** `20260808_192152_repeated`
+**Config:** identical to above, N_REPEATS increased from 5 to 8 (160 samples
+per algorithm instead of 100).
+
+**Results:** EA mean fidelity = 0.4731 (vs. 0.4728 with 5 repeats), SA mean
+fidelity = 0.3688 (vs. 0.3790 with 5 repeats). Gate counts and within-target
+std also closely match the original 5-repeat run (EA std 0.0442 vs. 0.0417;
+SA std 0.0666 vs. 0.0642).
+
+The EA/SA fidelity gap (0.1043) is, if anything, slightly larger with the
+extended sample than with the original 5 repeats (0.0938), and remains
+well above both algorithms' within-target noise. This confirms the main
+finding is stable under a 60% larger sample, not an artifact of the
+original repeat count.
+
 ---
 ## Entry 10 - 2026-08-05 - Minimum-fidelity floor experiment (Leo's suggestion)
 
