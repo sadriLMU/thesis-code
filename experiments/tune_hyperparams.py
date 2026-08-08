@@ -1,9 +1,11 @@
 """
 tune_hyperparams.py
 
-Uses Optuna to search for good EA and SA hyperparameters, replacing manual
-guess-and-check tuning (per Leo's feedback: "Optuna benutzen um bessere
-Ergebnisse zu bekommen, nicht mehr manuell anpassen").
+Uses Optuna to search for good EA and SA hyperparameters, replacing
+manual guess-and-check tuning (per Leo's feedback in the week-2 meeting:
+"Optuna benutzen um bessere Ergebnisse zu bekommen, nicht mehr manuell
+anpassen"). Produces the tuned hyperparameters reported in thesis Section
+5.1, Table 5.1, and research_log.md Entry 7.
 
 What's tuned vs. fixed:
   Tunable (genuine search-strategy hyperparameters):
@@ -11,12 +13,18 @@ What's tuned vs. fixed:
     SA: initial_temp, cooling_rate
   Fixed (these are experiment variables studied elsewhere in the thesis,
   not implementation details to auto-tune away):
-    n_qubits, beta, alpha, max_gates/n_gates, generation/iteration budgets
+    n_qubits, beta, alpha, max_gates, generation/iteration budgets
 
 Objective: mean `fitness` (alpha*fidelity - beta*gate_count) across
 N_TUNING_TARGETS target states -- the same quantity the algorithms
 themselves search for, so "better hyperparameters" means "better at the
 actual thing being optimized," not a different metric.
+
+Tuning target states (seeds 100-104) are deliberately disjoint from the
+reporting seeds (42-61, used in run_experiments.py / sweep_beta.py), to
+avoid selecting hyperparameters overfit to the specific targets results
+are later reported on (see research_log.md Entry 6-7 for the methodology
+issue this fixes: an earlier tuning run used overlapping seeds).
 
 Output:
   - results/optuna_studies/ea_study.db / sa_study.db : persistent Optuna
@@ -28,7 +36,6 @@ Output:
 
 Usage:
     cd thesis-code
-    pip install optuna --break-system-packages   # one-time, see requirements.txt
     python experiments/tune_hyperparams.py
 """
 
@@ -53,15 +60,15 @@ from fitness import fitness as fitness_fn
 # Configuration
 # ---------------------------------------------------------------------------
 N_QUBITS = 4
-N_TUNING_TARGETS = 5     # fewer than the main N_TARGETS=10, since each
-                          # Optuna trial runs a *full* EA/SA search
-BASE_SEED = 100           # deliberately disjoint from the reporting seeds
-                          # (42-51, used in run_experiments.py/sweep_beta.py),
-                          # so hyperparameters aren't selected on the same
-                          # targets they're later evaluated/reported on
+N_TUNING_TARGETS = 5      # fewer than the main N_TARGETS=20, since each
+                           # Optuna trial runs a *full* EA/SA search
+BASE_SEED = 100            # deliberately disjoint from the reporting seeds
+                           # (42-61, used in run_experiments.py/sweep_beta.py),
+                           # so hyperparameters aren't selected on the same
+                           # targets they're later evaluated/reported on
 
 ALPHA = 1.0
-BETA = 0.01                # fixed at the value used for reported results
+BETA = 0.01                 # fixed at the value used for reported results
 
 N_TRIALS_EA = 30
 N_TRIALS_SA = 30
@@ -70,7 +77,7 @@ N_TRIALS_SA = 30
 # that work well within the SAME compute budget already used for reporting,
 # rather than just favoring "search longer."
 EA_FIXED = dict(max_gates=15, n_generations=100, alpha=ALPHA, beta=BETA, verbose=False)
-SA_FIXED = dict(n_gates=20, min_temp=1e-4, max_iterations=2000, alpha=ALPHA, beta=BETA, verbose=False)
+SA_FIXED = dict(max_gates=15, min_temp=1e-4, max_iterations=2000, alpha=ALPHA, beta=BETA, verbose=False)
 
 RESULTS_DIR = os.path.join(SCRIPT_DIR, "..", "results")
 STUDIES_DIR = os.path.join(RESULTS_DIR, "optuna_studies")
@@ -85,8 +92,9 @@ TARGETS = [generate_target_state(N_QUBITS, seed=BASE_SEED + i)
 # ---------------------------------------------------------------------------
 def ea_objective(trial: optuna.Trial) -> float:
     """
-    One Optuna trial: sample pop_size/mutation_rate, run EA on all tuning
-    targets with those hyperparameters, return mean fitness.
+    One Optuna trial: samples pop_size and mutation_rate, runs EA on all
+    tuning targets with those values, and returns mean fitness across
+    targets as the objective to maximise.
     """
     pop_size = trial.suggest_int("pop_size", 10, 100)
     mutation_rate = trial.suggest_float("mutation_rate", 0.01, 0.5)
@@ -107,8 +115,9 @@ def ea_objective(trial: optuna.Trial) -> float:
 
 def sa_objective(trial: optuna.Trial) -> float:
     """
-    One Optuna trial: sample initial_temp/cooling_rate, run SA on all tuning
-    targets with those hyperparameters, return mean fitness.
+    One Optuna trial: samples initial_temp and cooling_rate, runs SA on
+    all tuning targets with those values, and returns mean fitness across
+    targets as the objective to maximise.
     """
     initial_temp = trial.suggest_float("initial_temp", 0.1, 5.0, log=True)
     cooling_rate = trial.suggest_float("cooling_rate", 0.9, 0.999)
@@ -131,6 +140,7 @@ def sa_objective(trial: optuna.Trial) -> float:
 # Output helpers
 # ---------------------------------------------------------------------------
 def save_best_params(study: optuna.Study, path: str):
+    """Saves the best trial's hyperparameters and value to a JSON file."""
     output = {
         "best_value": study.best_value,
         "best_params": study.best_params,
