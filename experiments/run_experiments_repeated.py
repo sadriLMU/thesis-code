@@ -50,7 +50,7 @@ from sa import simulated_annealing
 N_QUBITS = 4
 N_TARGETS = 20          # same target states as the main comparison
 BASE_SEED = 42
-N_REPEATS = 5           # repetitions per target, per algorithm
+N_REPEATS = 8           # repetitions per target, per algorithm
 
 ALPHA = 1.0
 BETA = 0.01
