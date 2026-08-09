@@ -38,6 +38,7 @@ thesis-code/
 │   │                           Same, with multiple repeats per target for
 │   │                           statistical robustness
 │   ├── sweep_beta.py           Beta (gate-count penalty) sensitivity sweep
+│   ├── sweep_beta_repeated.py  Same, with multiple repeats per (beta, target)
 │   ├── sweep_beta_floor.py     Compares standard vs. fidelity-floor fitness
 │   │                           across beta values (single run)
 │   ├── sweep_beta_floor_repeated.py
@@ -89,6 +90,7 @@ python experiments/run_experiments_repeated.py
 
 # Beta sensitivity sweep
 python experiments/sweep_beta.py
+python experiments/sweep_beta_repeated.py   # repeated version, used for reported results
 
 # Hyperparameter tuning (takes considerable time -- 30 trials per algorithm)
 python experiments/tune_hyperparams.py
@@ -113,17 +115,21 @@ reproducible and traceable back to its exact configuration.
 discussion.)
 
 - The evolutionary algorithm achieves consistently higher fidelity and
-  fidelity-per-gate than simulated annealing, confirmed via 5 repeated runs
-  per target across 20 target states (100 runs per algorithm).
-- This advantage holds across the tested range of the gate-count penalty
-  weight (beta).
+  fidelity-per-gate than simulated annealing, confirmed via repeated runs
+  (5-8 repeats per target across 20 target states, 100-160 runs per
+  algorithm), validated both before and after a precision fix to EA's
+  mutation length-check (see `research_log.md` Entry 12).
+- This advantage holds across the entire tested range of the gate-count
+  penalty weight (beta), also confirmed via repeated runs
+  (`sweep_beta_repeated.py`).
 - An additional fitness-function variant with a hard minimum-fidelity
   constraint (following Sünkel et al.'s QCO fitness design) reliably
   prevents EA's fidelity collapse at high beta, at the cost of roughly
-  2-3x more gates. The same constraint makes SA's outcomes highly
-  unpredictable rather than moderately worse, plausibly due to SA's
-  single-trajectory search lacking the redundancy of EA's population-based
-  search.
+  3-4x more gates. The same constraint makes SA's outcomes highly
+  unpredictable (bimodal) rather than moderately worse, plausibly due to
+  SA's single-trajectory search lacking the redundancy of EA's
+  population-based search. This finding is also confirmed via repeated
+  runs, both before and after the EA precision fix.
 
 ## Reproducibility Notes
 
@@ -133,7 +139,11 @@ discussion.)
 - Hyperparameters were tuned via Optuna on target states (seeds 100-104)
   disjoint from those used in the reported comparisons (seeds 42-61), to
   avoid tuning/reporting bias.
-- `research_log.md` documents two implementation bugs found and fixed
-  during development (see Entries 1-3), along with a before/after
-  comparison. All results reported in the thesis reflect the corrected
-  implementation.
+- `research_log.md` documents three implementation issues found and fixed
+  during development: two bugs in `sa.py` (Entries 1-3) and one precision
+  issue in `ea.py`'s mutation length-check (Entry 12), each with a
+  before/after comparison. The `ea.py` fix was confirmed result-neutral;
+  all affected experiments were nonetheless fully re-run and re-validated
+  with the corrected code (see the "UPDATE" sections in Entries 7-11).
+  Pre-fix run data is preserved in `results/archive/` for reference, not
+  used as reported results.
