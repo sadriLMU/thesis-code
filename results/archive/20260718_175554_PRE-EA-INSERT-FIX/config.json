@@ -1,0 +1,27 @@
+{
+  "run_id": "20260718_175554",
+  "n_qubits": 4,
+  "n_targets": 20,
+  "base_seed": 42,
+  "alpha": 1.0,
+  "beta": 0.01,
+  "ea_params": {
+    "max_gates": 15,
+    "pop_size": 67,
+    "n_generations": 100,
+    "mutation_rate": 0.0779,
+    "alpha": 1.0,
+    "beta": 0.01,
+    "verbose": false
+  },
+  "sa_params": {
+    "max_gates": 15,
+    "initial_temp": 0.256,
+    "cooling_rate": 0.9769,
+    "min_temp": 0.0001,
+    "max_iterations": 2000,
+    "alpha": 1.0,
+    "beta": 0.01,
+    "verbose": false
+  }
+}
