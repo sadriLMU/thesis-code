@@ -670,3 +670,53 @@ ablation study. This is now purely a presentation/framing decision, not
 one blocked by data quality or robustness concerns.
 
 ---
+
+## Entry 12 - 2026-08-09 - EA mutate() insert-check precision fix, validated as result-neutral
+
+**Files changed:** src/ea.py
+**Commit:** fix(ea): correct insert-length check to test actual accumulated
+length, matching SA's equivalent check
+
+**Why this change:** during code documentation review, found that EA's
+mutate() insert check (`len(mutated) + len(circuit) < max_gates`) compared
+against the original circuit's full length rather than the actual
+accumulated length, unlike SA's equivalent check in neighbor()
+(`len(new_circuit) < max_gates`), which tests the true current length
+directly. EA's check could block valid inserts prematurely - e.g. for a
+10-gate circuit with max_gates=15, inserts got blocked once `mutated`
+reached only 5 gates, well below the actual 15-gate limit. This created an
+unintended asymmetry: EA's length cap was effectively stricter than SA's,
+relevant to a thesis whose core question is a fair EA vs. SA comparison.
+
+**Fix:** `len(mutated) < max_gates - 1` - tests the actual accumulated
+length directly, precisely mirroring SA's check.
+
+**Validation run (run_id 20260809_215244, N_TARGETS=20, same seeds/params
+as Entry 7/9):**
+
+| | EA fidelity | EA gates | SA fidelity | SA gates |
+|---|---|---|---|---|
+| Entry 7 (pre-fix) | 0.462 | 4.85 | 0.384 | 6.05 |
+| Entry 9, 5 repeats (pre-fix) | 0.4728 | 5.29 | 0.3790 | 6.36 |
+| Entry 9, 8 repeats (pre-fix) | 0.4731 | 5.24 | 0.3688 | 6.26 |
+| This run (post-fix) | 0.4620 | 5.20 | 0.3843 | 6.05 |
+
+**Conclusion: the fix is result-neutral.** The post-fix values fall
+entirely within the range of normal run-to-run variation already observed
+across Entry 7/9's pre-fix runs. As hypothesized, the flawed check rarely
+triggered in practice, since observed circuit lengths (2-12 gates) stay
+well below max_gates=15.
+
+**Full re-validation:** Entries 7, 8, 9, 10, and 11 were all subsequently
+re-run in full with the corrected code (see the "UPDATE" sections appended
+to each). Every core finding held unchanged.
+
+**Your interpretation (fill in):**
+- Why might "insert always succeeds, no cap" (the same category of bug
+  originally found in sa.py, Entry 3) be an easy pattern to overlook when
+  writing a mutation/neighbor-generating function in general? _______________
+- Given this fix turned out to be result-neutral, was the decision to
+  fully re-validate all entries the right call for a thesis, given the
+  time it took? _______________
+
+---
