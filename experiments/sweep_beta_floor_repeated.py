@@ -190,6 +190,16 @@ def save_summary_csv(rows, path):
     """
     Aggregates raw rows into mean/std per (beta, algorithm, variant),
     across all targets and repeats (n_samples = N_TARGETS * N_REPEATS).
+
+    Also computes within_target_std and across_target_std separately
+    (see sweep_beta_repeated.py's save_summary_csv() for the detailed
+    rationale -- same decomposition, same reason). This matters
+    specifically for this experiment's headline claim, "SA-floor's std
+    is roughly 2x SA-standard's" (research_log.md Entry 11): that
+    comparison is about run-to-run instability for a fixed target, i.e.
+    within_target_std, not the pooled std across targets+repeats, which
+    is dominated by across-target difficulty variation and barely
+    reflects the 2x effect at all.
     """
     summary_rows = []
     for beta in BETA_VALUES:
@@ -200,14 +210,28 @@ def save_summary_csv(rows, path):
                         and r["fitness_variant"] == variant]
                 fids = [r["fidelity"] for r in vals]
                 gates = [r["gate_count"] for r in vals]
+
+                target_idxs = sorted(set(r["target_idx"] for r in vals))
+                per_target_fids = {
+                    t: [r["fidelity"] for r in vals if r["target_idx"] == t]
+                    for t in target_idxs
+                }
+                within_stds = [np.std(v) for v in per_target_fids.values() if len(v) > 1]
+                within_target_std = float(np.mean(within_stds)) if within_stds else float("nan")
+                target_means = [np.mean(v) for v in per_target_fids.values()]
+                across_target_std = float(np.std(target_means))
+
                 summary_rows.append({
                     "beta": beta, "algorithm": algo, "fitness_variant": variant,
                     "n_samples": len(fids),
                     "mean_fidelity": np.mean(fids), "std_fidelity": np.std(fids),
+                    "within_target_std": within_target_std,
+                    "across_target_std": across_target_std,
                     "mean_gate_count": np.mean(gates), "std_gate_count": np.std(gates),
                 })
     fieldnames = ["beta", "algorithm", "fitness_variant", "n_samples",
-                  "mean_fidelity", "std_fidelity", "mean_gate_count", "std_gate_count"]
+                  "mean_fidelity", "std_fidelity", "within_target_std",
+                  "across_target_std", "mean_gate_count", "std_gate_count"]
     with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -232,30 +256,38 @@ def save_config(path):
 
 def plot_comparison(summary_rows, path):
     """
-    Plots mean fidelity vs. beta with error bars (std across
-    targets+repeats), standard vs. floor variant, one subplot per
-    algorithm.
+    Plots mean fidelity vs. beta with error bars, standard vs. floor
+    variant, one subplot per algorithm.
+
+    Error bars show within_target_std (run-to-run noise), not the pooled
+    std across targets+repeats -- see save_summary_csv() above for the
+    decomposition. This distinction matters most for this particular
+    chart: the "SA becomes unstable under the floor" finding is
+    specifically about within_target_std roughly doubling (research_log.md
+    Entry 11), an effect that the pooled std mostly hides behind the
+    much larger across-target variation.
     """
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
 
     for ax, algo in zip(axes, ("EA", "SA")):
         for variant, color, style in (("standard", "tab:blue", "-"),
                                        ("floor", "tab:red", "--")):
-            means, stds = [], []
+            means, within_stds = [], []
             for beta in BETA_VALUES:
                 row = next(r for r in summary_rows
                            if r["beta"] == beta and r["algorithm"] == algo
                            and r["fitness_variant"] == variant)
                 means.append(row["mean_fidelity"])
-                stds.append(row["std_fidelity"])
+                within_stds.append(row["within_target_std"])
             # fmt="o" -- marker only; the line style is set via linestyle
             # below, so the two aren't specified redundantly/conflictingly.
-            ax.errorbar(BETA_VALUES, means, yerr=stds, fmt="o",
+            ax.errorbar(BETA_VALUES, means, yerr=within_stds, fmt="o",
                         linestyle=style, color=color, label=variant,
                         capsize=4)
         ax.set_xlabel("beta")
-        ax.set_ylabel("Mean fidelity (error bars = std across targets+repeats)")
-        ax.set_title(f"{algo}: standard vs. floor fitness (repeated, N={N_REPEATS})")
+        ax.set_ylabel("Mean fidelity")
+        ax.set_title(f"{algo}: standard vs. floor fitness (repeated, N={N_REPEATS})\n"
+                     f"error bars = within-target std (run-to-run noise)")
         ax.legend()
         ax.grid(True, alpha=0.3)
 

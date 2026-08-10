@@ -155,6 +155,26 @@ def save_summary_csv(rows, path):
     """
     Aggregates raw rows into mean/std per (beta, algorithm), across all
     targets and repeats (n_samples = N_TARGETS * N_REPEATS).
+
+    Reports three different std values, because "std_fidelity" alone
+    (pooled across all targets and repeats) conflates two different
+    sources of variation: how much a given target's result varies across
+    repeated runs (run-to-run noise) versus how much target difficulty
+    itself varies (across-target variation). These are decomposed
+    separately, matching the method already used for the main comparison
+    table (research_log.md Entry 9 / experiments.tex Table 5.2):
+
+        within_target_std: mean, across targets, of the std of that
+            target's N_REPEATS fidelity values -- the run-to-run noise.
+        across_target_std: std, across targets, of each target's mean
+            fidelity -- how much target difficulty varies.
+
+    Claims like "the EA/SA gap exceeds run-to-run noise" (Entry 9) or
+    "SA-floor's std is roughly 2x SA-standard's" (Entry 11) refer
+    specifically to within_target_std, not the pooled std_fidelity --
+    see plot_comparison() below, which plots within_target_std as the
+    error bar for this reason. std_fidelity is kept in the CSV for
+    reference.
     """
     summary_rows = []
     for beta in BETA_VALUES:
@@ -162,13 +182,29 @@ def save_summary_csv(rows, path):
             vals = [r for r in rows if r["beta"] == beta and r["algorithm"] == algo]
             fids = [r["fidelity"] for r in vals]
             gates = [r["gate_count"] for r in vals]
+
+            # Decompose variance into within-target and across-target
+            # components, matching the main comparison table's method.
+            target_idxs = sorted(set(r["target_idx"] for r in vals))
+            per_target_fids = {
+                t: [r["fidelity"] for r in vals if r["target_idx"] == t]
+                for t in target_idxs
+            }
+            within_stds = [np.std(v) for v in per_target_fids.values() if len(v) > 1]
+            within_target_std = float(np.mean(within_stds)) if within_stds else float("nan")
+            target_means = [np.mean(v) for v in per_target_fids.values()]
+            across_target_std = float(np.std(target_means))
+
             summary_rows.append({
                 "beta": beta, "algorithm": algo, "n_samples": len(fids),
                 "mean_fidelity": np.mean(fids), "std_fidelity": np.std(fids),
+                "within_target_std": within_target_std,
+                "across_target_std": across_target_std,
                 "mean_gate_count": np.mean(gates), "std_gate_count": np.std(gates),
             })
     fieldnames = ["beta", "algorithm", "n_samples", "mean_fidelity",
-                  "std_fidelity", "mean_gate_count", "std_gate_count"]
+                  "std_fidelity", "within_target_std", "across_target_std",
+                  "mean_gate_count", "std_gate_count"]
     with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -192,24 +228,32 @@ def save_config(path):
 
 def plot_comparison(summary_rows, path):
     """
-    Plots mean fidelity vs. beta with error bars (std across
-    targets+repeats), EA vs. SA, in a single shared-axis chart.
+    Plots mean fidelity vs. beta with error bars, EA vs. SA, in a single
+    shared-axis chart.
+
+    Error bars show within_target_std (run-to-run noise for a fixed
+    target), not the pooled std across all targets+repeats -- see
+    save_summary_csv() above for the decomposition and the reasoning.
+    across_target_std is not plotted here; it belongs in the
+    accompanying table/text (Table 5.2) rather than in this figure, to
+    keep the chart to a single, unambiguous comparison.
     """
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(7, 5.5))
 
     for algo, color in (("EA", "tab:blue"), ("SA", "tab:orange")):
-        means, stds = [], []
+        means, within_stds = [], []
         for beta in BETA_VALUES:
             row = next(r for r in summary_rows
                        if r["beta"] == beta and r["algorithm"] == algo)
             means.append(row["mean_fidelity"])
-            stds.append(row["std_fidelity"])
-        ax.errorbar(BETA_VALUES, means, yerr=stds, fmt="o", linestyle="-",
+            within_stds.append(row["within_target_std"])
+        ax.errorbar(BETA_VALUES, means, yerr=within_stds, fmt="o-",
                     color=color, label=algo, capsize=4)
 
     ax.set_xlabel("beta (gate-count penalty weight)")
-    ax.set_ylabel("Mean fidelity (error bars = std across targets+repeats)")
-    ax.set_title(f"Beta sweep, repeated (N={N_REPEATS} repeats/target/beta)")
+    ax.set_ylabel("Mean fidelity")
+    ax.set_title(f"Beta sweep, repeated (N={N_REPEATS} repeats/target/beta)\n"
+                 f"error bars = within-target std")
     ax.legend()
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
