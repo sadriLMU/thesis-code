@@ -1,6 +1,8 @@
 ﻿venv/
+.venv/
 __pycache__/
 *.pyc
 results/runs/
+results/figures_debug/
 
 .idea/

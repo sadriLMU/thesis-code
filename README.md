@@ -44,21 +44,33 @@ thesis-code/
 │   ├── sweep_beta_floor_repeated.py
 │   │                           Same, with repeats
 │   ├── tune_hyperparams.py     Optuna-based automatic hyperparameter tuning
-│   ├── plot_circuits.py        Exports circuit diagrams (best circuits,
-│   │                           SA neighbor example, EA crossover example)
+│   ├── plot_circuits.py        Exports circuit diagrams. Best-circuit
+│   │                           examples are picked by scanning all 20
+│   │                           target seeds and choosing the one closest
+│   │                           to the mean gate count, rather than a
+│   │                           fixed seed. Also exports a crossover-trace
+│   │                           diagram (ea_crossover_trace.png) showing
+│   │                           the gate-list split point directly, since
+│   │                           Qiskit's per-qubit circuit diagrams alone
+│   │                           cannot show this. Writes suggested LaTeX
+│   │                           captions to results/figures/CAPTIONS.md.
 │   ├── verify_crossover.py     Prints the exact gate-list origin for a
 │   │                           crossover example, to verify correctness
 │   │                           independently of the circuit diagram
 │   └── plot_results_evolution.py
 │                               Supporting chart showing how results changed
-│                               across development stages (not part of the
-│                               thesis body; for internal reference)
+│                               across development stages. Writes to
+│                               results/figures_debug/, not results/figures/,
+│                               since it is explicitly not part of the
+│                               thesis body (internal reference only).
 ├── results/
 │   ├── runs/                   Output of each experiment run (gitignored --
 │   │                           regenerate by re-running the scripts)
 │   ├── archive/                Pre-bugfix experiment outputs, kept for
 │   │                           reference (see research_log.md)
 │   ├── figures/                Exported plots/diagrams used in the thesis
+│   ├── figures_debug/          Supporting/debug charts, not used in the
+│   │                           thesis (gitignored, regenerate as needed)
 │   └── optuna_studies/         Persistent Optuna tuning databases
 ├── test_ea.py, test_sa.py      Quick manual sanity-check scripts
 ├── research_log.md             Dated log of every experiment: what was run,
@@ -99,7 +111,8 @@ python experiments/tune_hyperparams.py
 python experiments/sweep_beta_floor.py
 python experiments/sweep_beta_floor_repeated.py
 
-# Circuit diagrams for the thesis
+# Circuit diagrams for the thesis (scans all 20 target seeds to pick a
+# representative example; takes ~2 minutes)
 python experiments/plot_circuits.py
 python experiments/verify_crossover.py
 ```
@@ -121,7 +134,10 @@ discussion.)
   mutation length-check (see `research_log.md` Entry 12).
 - This advantage holds across the entire tested range of the gate-count
   penalty weight (beta), also confirmed via repeated runs
-  (`sweep_beta_repeated.py`).
+  (`sweep_beta_repeated.py`). Decomposing run-to-run noise from
+  target-to-target variation shows the EA/SA gap exceeds run-to-run noise
+  at every tested beta except the highest, where the margin narrows
+  alongside the mean gap itself (see `research_log.md` Entry 13).
 - An additional fitness-function variant with a hard minimum-fidelity
   constraint (following Sünkel et al.'s QCO fitness design) reliably
   prevents EA's fidelity collapse at high beta, at the cost of roughly
@@ -129,7 +145,11 @@ discussion.)
   unpredictable (bimodal) rather than moderately worse, plausibly due to
   SA's single-trajectory search lacking the redundancy of EA's
   population-based search. This finding is also confirmed via repeated
-  runs, both before and after the EA precision fix.
+  runs, both before and after the EA precision fix; a more precise
+  within-target analysis puts SA's floor-induced instability at roughly
+  2-3x its standard-fitness run-to-run variance across most of the beta
+  range tested, rising sharply at the highest beta value (see
+  `research_log.md` Entry 13).
 
 ## Reproducibility Notes
 
