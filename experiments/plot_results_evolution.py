@@ -20,7 +20,8 @@ extension (research_log.md Entry 9 update, 2026-08-08) and the Entry
 design scope (this chart covers the main-comparison trend only, not the
 separate floor ablation study).
 
-Output (in results/figures/):
+Output (in results/figures_debug/, kept separate from results/figures/
+so it cannot end up in the thesis by accident -- see note below):
   - fidelity_evolution.png : EA vs. SA mean fidelity across stages
   - gate_count_evolution.png : EA vs. SA mean gate count across stages
 
@@ -33,7 +34,7 @@ import os
 import matplotlib.pyplot as plt
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-FIGURES_DIR = os.path.join(SCRIPT_DIR, "..", "results", "figures")
+FIGURES_DIR = os.path.join(SCRIPT_DIR, "..", "results", "figures_debug")
 os.makedirs(FIGURES_DIR, exist_ok=True)
 
 # (label, EA fidelity, SA fidelity, EA gate count, SA gate count, note)
