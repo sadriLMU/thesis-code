@@ -39,17 +39,29 @@ def selection(population: list, scores: list, n_select: int) -> list:
     return [ind for _, ind in paired[:n_select]]
 
 
-def crossover(parent1: list, parent2: list) -> tuple:
+def crossover(parent1: list, parent2: list, return_point: bool = False):
     """
     Single-point crossover between two parent circuits.
     Works with variable lengths -- the crossover point is chosen
     within the shorter parent to avoid index errors.
+
+    Args:
+        return_point: If True, also returns the chosen split index (or
+            None for the degenerate case where either parent has fewer
+            than 2 gates and both are copied unchanged). Used by
+            experiments/plot_circuits.py to draw the crossover-trace
+            figure, where the split point needs to be known explicitly
+            rather than reconstructed after the fact.
     """
     if len(parent1) < 2 or len(parent2) < 2:
+        if return_point:
+            return parent1[:], parent2[:], None
         return parent1[:], parent2[:]
     point = np.random.randint(1, min(len(parent1), len(parent2)))
     child1 = parent1[:point] + parent2[point:]
     child2 = parent2[:point] + parent1[point:]
+    if return_point:
+        return child1, child2, point
     return child1, child2
 
 
