@@ -720,3 +720,120 @@ to each). Every core finding held unchanged.
   time it took? _______________
 
 ---
+
+## Entry 13 - 2026-08-10 - Within-target/across-target error bar decomposition; figure fixes for thesis presentation
+
+**Files changed:** experiments/sweep_beta_repeated.py, experiments/sweep_beta_floor_repeated.py,
+experiments/run_experiments.py, experiments/plot_circuits.py, experiments/plot_results_evolution.py,
+src/ea.py
+
+**Why this change:** while preparing figures for the thesis, found that the
+error bars in beta_sweep_repeated.png and beta_floor_comparison_repeated.png
+were computed as a single pooled std across all 20 targets x N repeats
+combined. This conflates two different sources of variation - run-to-run
+noise for a fixed target, and target-to-target difficulty variation - and
+the pooled value is dominated by the latter (which is typically 2-3x
+larger). Several existing claims in this log (e.g. Entry 9's "the EA/SA
+gap exceeds run-to-run noise", Entry 11's "SA-floor's std is roughly 2x
+SA-standard's") are specifically about run-to-run noise, i.e. the
+within-target component, not the pooled value that was actually being
+plotted. save_summary_csv() in both sweep scripts now reports
+within_target_std and across_target_std as separate columns; the plots use
+within_target_std as the error bar.
+
+Also fixed while reviewing the same figures:
+- The crossover illustration (ea_crossover_parent1/2/child.png) cannot
+  show where the split happened, because Qiskit's drawer groups gates by
+  qubit wire rather than by their position in the flat gate list
+  crossover() operates on (same issue verify_crossover.py already checks
+  for numerically). plot_circuits.py now also produces
+  ea_crossover_trace.png, which draws the flat gate list directly with
+  origin-coloured gates and an explicit split marker.
+- The best-circuit example always used Target 1 (seed 42), which happened
+  to be an outlier for SA (11 gates vs. the reported mean of 6.26).
+  plot_circuits.py now scans all 20 seeds and picks the one closest to
+  both algorithms' mean gate count (seed 49 this run: EA 5 gates,
+  fidelity 0.505; SA 5 gates, fidelity 0.454).
+- convergence_overlay.png shared a raw step axis between EA generations
+  and SA iterations despite these not being computationally equivalent (1
+  EA generation = pop_size fitness evaluations, 1 SA iteration = 1). Added
+  convergence_overlay_by_evaluations.png, normalised by number of fitness
+  evaluations.
+- ea.py's crossover() gained an optional return_point argument (default
+  False, no effect on existing callers) so plot_circuits.py can draw the
+  trace figure without reconstructing the split point after the fact.
+
+**Re-validation runs (fresh runs, same seeds/params as Entries 8/9/11):**
+
+All three experiments were re-run in full to get within/across-target std.
+Pooled mean_fidelity and mean_gate_count values match the corresponding
+prior entries to 3 decimal places in every case (see raw CSVs), confirming
+these are genuinely the same underlying results, just re-analysed.
+
+*Main beta sweep (sweep_beta_repeated.py, 20260810_022552_beta_sweep_repeated):*
+
+| beta | EA within-std | SA within-std | EA-SA gap |
+|---|---|---|---|
+| 0.01 | 0.040 | 0.064 | 0.089 |
+| 0.02 | 0.052 | 0.068 | 0.080 |
+| 0.03 | 0.044 | 0.067 | 0.078 |
+| 0.05 | 0.062 | 0.061 | 0.074 |
+| 0.07 | 0.051 | 0.059 | 0.062 |
+
+The gap exceeds both algorithms' within-target std at every beta except
+0.07, where it is close to (slightly above) SA's within-target std
+(0.062 vs. 0.059) - the statistical margin narrows at high beta alongside
+the mean gap itself, consistent with the "near-parity at beta=0.07"
+observation already in experiments.tex, but this is the first time that
+narrowing has been checked against run-to-run noise specifically rather
+than just the mean values.
+
+*Floor experiment (sweep_beta_floor_repeated.py, run 20260810_022613):*
+
+| beta | SA-standard within-std | SA-floor within-std | ratio |
+|---|---|---|---|
+| 0.03 | 0.044 | 0.124 | 2.8x |
+| 0.05 | 0.054 | 0.120 | 2.2x |
+| 0.07 | 0.048 | 0.115 | 2.4x |
+| 0.10 | 0.036 | 0.109 | 3.0x |
+| 0.15 | 0.0086 | 0.111 | 12.9x |
+
+This is a sharper version of Entry 11's "roughly 2x" finding: the actual
+within-target ratio ranges from 2.2x-3.0x across most of the beta range,
+consistent with Entry 11, but rises to ~13x at beta=0.15, where
+SA-standard's within-target std collapses to near zero (0.0086) - SA
+without the floor becomes almost deterministic at high beta, converging
+on the same short/simple circuit nearly every run, while SA-floor remains
+highly volatile (~0.111) across the whole beta range tested. The pooled
+std used in Entry 11 could not show this, since it averages over the
+target-to-target variation that dominates it at every beta.
+
+*Convergence (run_experiments.py, run 20260810_022623):* pooled
+mean_fidelity/mean_gate_count match Entry 12's validation run exactly
+(EA 0.462/5.20, SA 0.384/6.05). The new evaluation-normalised convergence
+plot shows SA's run terminates after ~330 fitness evaluations (cooling
+schedule hits min_temp) versus EA's ~6700 (100 generations x pop_size 67)
+- SA's absolute evaluation budget in this run is roughly 20x smaller than
+EA's, which is worth keeping in mind when comparing final fidelity, not
+just number of generations/iterations.
+
+**Conclusion:** none of the core findings changed - this is a re-analysis
+of the same results with a more precise error metric, not new data. But
+the floor experiment's instability finding is now better supported (a
+per-beta ratio rather than a single "~2x" figure, with the beta=0.15 case
+being considerably more dramatic than previously stated), and the
+evaluation-budget asymmetry between EA and SA is a new observation not
+previously logged.
+
+**Your interpretation (fill in):**
+- Does the SA-floor instability ratio growing from ~2x to ~13x as beta
+  increases change how you'd frame the floor experiment's conclusion in
+  the Discussion, compared to the flatter "~2x at every beta" framing in
+  Entry 11? _______________
+- SA's evaluation budget is much smaller than EA's in this setup (a
+  consequence of the tuned cooling schedule hitting min_temp early, not a
+  deliberate experimental control) - does this belong in the Methodology
+  as a limitation, in the Discussion as a possible confound, or is it
+  outside the scope of what this thesis needs to address? _______________
+
+---
