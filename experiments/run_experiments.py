@@ -186,24 +186,34 @@ def append_summary(rows, path):
     print(f"Appended run summary to {path}")
 
 
-def plot_convergence(ea_histories, sa_histories, path):
+def plot_convergence(ea_histories, sa_histories, path, pop_size=None):
     """
-    Saves two convergence plots: a shared-axis EA-vs-SA overlay (used for
-    the thesis figure, see thesis Section 5.2) and a side-by-side pair.
+    Saves three convergence plots: a shared-axis EA-vs-SA overlay by raw
+    step (used for the thesis figure, see thesis Section 5.2), the same
+    overlay but normalised by number of fitness evaluations, and a
+    side-by-side pair.
 
     Note: EA's x-axis is "generation" (1 generation = pop_size fitness
-    evaluations) while SA's is "iteration" (1 iteration = 1 evaluation) --
-    these are not directly comparable in terms of computational cost. The
-    overlay plot shares an axis for visual comparison of final fidelity
-    reached, not for a fair per-evaluation comparison; see thesis Section
-    5.2 for discussion.
+    evaluations, i.e. 67 for the tuned hyperparameters) while SA's is
+    "iteration" (1 iteration = 1 evaluation) -- these are not
+    computationally equivalent. The raw-step overlay's x-axis label
+    states this explicitly rather than leaving it as an implicit
+    assumption. The evaluation-normalised overlay divides this out by
+    scaling EA's x-axis by pop_size, giving both curves a shared "number
+    of fitness evaluations" axis, which is the fair basis to use for any
+    claim about relative convergence *speed* (as opposed to final
+    fidelity reached, for which the raw-step overlay is fine).
+
+    pop_size must be passed for the normalised plot; if None, the
+    normalised plot is skipped (raw overlay and side-by-side are still
+    produced).
     """
     ea_arr = np.array(ea_histories)
     sa_arr = np.array(sa_histories)
     ea_mean, ea_std = ea_arr.mean(axis=0), ea_arr.std(axis=0)
     sa_mean, sa_std = sa_arr.mean(axis=0), sa_arr.std(axis=0)
 
-    # --- Overlay plot ---
+    # --- Overlay plot (raw step count) ---
     fig1, ax = plt.subplots(figsize=(7, 5))
     ax.plot(ea_mean, color="tab:blue", label="EA (mean)")
     ax.fill_between(range(len(ea_mean)), ea_mean - ea_std, ea_mean + ea_std,
@@ -212,7 +222,9 @@ def plot_convergence(ea_histories, sa_histories, path):
     ax.fill_between(range(len(sa_mean)), sa_mean - sa_std, sa_mean + sa_std,
                      alpha=0.2, color="tab:orange")
     ax.set_title("EA vs. SA Convergence (Fidelity)")
-    ax.set_xlabel("Step (EA: generation, SA: iteration)")
+    ax.set_xlabel("Step (EA: generation, SA: iteration -- NOT computationally\n"
+                  "equivalent: 1 EA generation costs pop_size fitness "
+                  "evaluations, 1 SA iteration costs 1)")
     ax.set_ylabel("Best fidelity")
     ax.legend()
     plt.tight_layout()
@@ -220,6 +232,28 @@ def plot_convergence(ea_histories, sa_histories, path):
     plt.savefig(overlay_path, dpi=150)
     plt.close(fig1)
     print(f"Saved overlay convergence plot to {overlay_path}")
+
+    # --- Overlay normalised by number of fitness evaluations ---
+    if pop_size is not None:
+        fig1b, ax = plt.subplots(figsize=(7, 5))
+        ea_x = np.arange(len(ea_mean)) * pop_size  # 1 generation = pop_size evals
+        sa_x = np.arange(len(sa_mean))              # 1 iteration = 1 eval
+        ax.plot(ea_x, ea_mean, color="tab:blue", label="EA (mean)")
+        ax.fill_between(ea_x, ea_mean - ea_std, ea_mean + ea_std,
+                         alpha=0.2, color="tab:blue")
+        ax.plot(sa_x, sa_mean, color="tab:orange", label="SA (mean)")
+        ax.fill_between(sa_x, sa_mean - sa_std, sa_mean + sa_std,
+                         alpha=0.2, color="tab:orange")
+        ax.set_title("EA vs. SA Convergence, normalised by fitness evaluations")
+        ax.set_xlabel(f"Number of fitness evaluations "
+                       f"(EA: generation $\\times$ {pop_size}, SA: iteration)")
+        ax.set_ylabel("Best fidelity")
+        ax.legend()
+        plt.tight_layout()
+        overlay_evals_path = path.replace(".png", "_overlay_by_evaluations.png")
+        plt.savefig(overlay_evals_path, dpi=150)
+        plt.close(fig1b)
+        print(f"Saved evaluation-normalised overlay plot to {overlay_evals_path}")
 
     # --- Side-by-side plot ---
     fig2, axes = plt.subplots(1, 2, figsize=(12, 5))
@@ -253,6 +287,7 @@ if __name__ == "__main__":
     save_config(os.path.join(RUN_DIR, "config.json"))
     append_summary(rows, SUMMARY_PATH)
     plot_convergence(ea_histories, sa_histories,
-                      os.path.join(RUN_DIR, "convergence.png"))
+                      os.path.join(RUN_DIR, "convergence.png"),
+                      pop_size=EA_PARAMS["pop_size"])
 
     print(f"\nRun complete. All outputs for this run are in: {RUN_DIR}")
