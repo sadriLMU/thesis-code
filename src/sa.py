@@ -142,6 +142,12 @@ def simulated_annealing(
             history: List of best fidelity per iteration -- pure
                 fidelity, matching ea.py's history convention, not the
                 penalized fitness score (see research_log.md Entry 3).
+            fitness_history: List of best fitness per iteration -- the
+                penalised score alpha*fidelity - beta*gate_count that the
+                search actually maximises, as opposed to `history`, which
+                records pure fidelity. Both refer to the same circuit
+                (the incumbent best), so they can be plotted against each
+                other directly. Mirrors ea.py's fitness_history.
     """
     fn = fitness_fn if fitness_fn is not None else default_fitness
 
@@ -155,6 +161,7 @@ def simulated_annealing(
 
     temperature = initial_temp
     history = []
+    fitness_history = []
     iteration = 0
 
     while temperature > min_temp and iteration < max_iterations:
@@ -171,7 +178,10 @@ def simulated_annealing(
             best_score = current_score
             best_fidelity = compute_fidelity(best_circuit, target_state, n_qubits)
 
+        # best_score is already the fitness of best_circuit; recording
+        # it costs nothing extra and does not affect the search.
         history.append(best_fidelity)
+        fitness_history.append(float(best_score))
 
         temperature *= cooling_rate
         iteration += 1
@@ -184,5 +194,6 @@ def simulated_annealing(
         'best_circuit': best_circuit,
         'best_fidelity': compute_fidelity(best_circuit, target_state, n_qubits),
         'best_gate_count': compute_gate_count(best_circuit),
-        'history': history
+        'history': history,
+        'fitness_history': fitness_history
     }

@@ -39,29 +39,17 @@ def selection(population: list, scores: list, n_select: int) -> list:
     return [ind for _, ind in paired[:n_select]]
 
 
-def crossover(parent1: list, parent2: list, return_point: bool = False):
+def crossover(parent1: list, parent2: list) -> tuple:
     """
     Single-point crossover between two parent circuits.
     Works with variable lengths -- the crossover point is chosen
     within the shorter parent to avoid index errors.
-
-    Args:
-        return_point: If True, also returns the chosen split index (or
-            None for the degenerate case where either parent has fewer
-            than 2 gates and both are copied unchanged). Used by
-            experiments/plot_circuits.py to draw the crossover-trace
-            figure, where the split point needs to be known explicitly
-            rather than reconstructed after the fact.
     """
     if len(parent1) < 2 or len(parent2) < 2:
-        if return_point:
-            return parent1[:], parent2[:], None
         return parent1[:], parent2[:]
     point = np.random.randint(1, min(len(parent1), len(parent2)))
     child1 = parent1[:point] + parent2[point:]
     child2 = parent2[:point] + parent1[point:]
-    if return_point:
-        return child1, child2, point
     return child1, child2
 
 
@@ -143,10 +131,18 @@ def evolutionary_algorithm(
         best_fidelity:  float (0 to 1)
         best_gate_count: int
         history:        list of best fidelity per generation
+        fitness_history: list of best fitness per generation -- the
+                        penalised score alpha*fidelity - beta*gate_count
+                        that the search actually maximises, as opposed to
+                        `history`, which records pure fidelity. Both refer
+                        to the same individual (the generation's best by
+                        fitness), so they can be plotted against each
+                        other directly.
     """
     # Step 1: Initialize population with variable circuit lengths
     population = initialize_population(pop_size, n_qubits, max_gates)
     history = []
+    fitness_history = []
 
     for gen in range(n_generations):
         # Step 2: Evaluate fitness of every circuit
@@ -155,9 +151,13 @@ def evolutionary_algorithm(
         best_idx = int(np.argmax(scores))
         best_individual = population[best_idx][:]
 
-        # Track best fidelity for convergence plot
+        # Track best fidelity and best fitness for convergence plots.
+        # scores[best_idx] is already the fitness of best_individual --
+        # it is what selection below acts on -- so recording it costs
+        # nothing extra and does not affect the search in any way.
         best_fidelity = compute_fidelity(best_individual, target_state, n_qubits)
         history.append(best_fidelity)
+        fitness_history.append(float(scores[best_idx]))
 
         if verbose and gen % 20 == 0:
             print(f"Gen {gen:4d} | Fidelity: {best_fidelity:.4f} | "
@@ -193,5 +193,6 @@ def evolutionary_algorithm(
         'best_circuit':    best_circuit,
         'best_fidelity':   compute_fidelity(best_circuit, target_state, n_qubits),
         'best_gate_count': compute_gate_count(best_circuit),
-        'history':         history
+        'history':         history,
+        'fitness_history': fitness_history
     }

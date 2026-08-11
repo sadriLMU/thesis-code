@@ -96,10 +96,18 @@ def run_all():
         ea_histories, sa_histories: lists of per-generation/per-iteration
             fidelity histories, one list per target, used for the
             convergence plots.
+        ea_fitness_histories, sa_fitness_histories: the same, but
+            recording fitness (alpha*fidelity - beta*gate_count) rather
+            than pure fidelity. Fitness is what both algorithms actually
+            maximise, so the fitness curves show the quantity being
+            optimised, while the fidelity curves show one of its two
+            components.
     """
     rows = []
     ea_histories = []
     sa_histories = []
+    ea_fitness_histories = []
+    sa_fitness_histories = []
 
     for i in range(N_TARGETS):
         seed = BASE_SEED + i
@@ -115,6 +123,7 @@ def run_all():
             "gate_count": ea_result["best_gate_count"],
         })
         ea_histories.append(ea_result["history"])
+        ea_fitness_histories.append(ea_result["fitness_history"])
         print(f"  EA -> fidelity={ea_result['best_fidelity']:.4f}, "
               f"gates={ea_result['best_gate_count']}")
 
@@ -126,10 +135,12 @@ def run_all():
             "gate_count": sa_result["best_gate_count"],
         })
         sa_histories.append(sa_result["history"])
+        sa_fitness_histories.append(sa_result["fitness_history"])
         print(f"  SA -> fidelity={sa_result['best_fidelity']:.4f}, "
               f"gates={sa_result['best_gate_count']}")
 
-    return rows, ea_histories, sa_histories
+    return (rows, ea_histories, sa_histories,
+            ea_fitness_histories, sa_fitness_histories)
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +232,7 @@ def plot_convergence(ea_histories, sa_histories, path, pop_size=None):
     ax.plot(sa_mean, color="tab:orange", label="SA (mean)")
     ax.fill_between(range(len(sa_mean)), sa_mean - sa_std, sa_mean + sa_std,
                      alpha=0.2, color="tab:orange")
-    ax.set_title("EA vs. SA Convergence (Fidelity)")
+    ax.set_title(f"EA vs. SA convergence, fidelity ({N_QUBITS}-qubit circuits)")
     ax.set_xlabel("Step (EA: generation, SA: iteration -- NOT computationally\n"
                   "equivalent: 1 EA generation costs pop_size fitness "
                   "evaluations, 1 SA iteration costs 1)")
@@ -244,7 +255,8 @@ def plot_convergence(ea_histories, sa_histories, path, pop_size=None):
         ax.plot(sa_x, sa_mean, color="tab:orange", label="SA (mean)")
         ax.fill_between(sa_x, sa_mean - sa_std, sa_mean + sa_std,
                          alpha=0.2, color="tab:orange")
-        ax.set_title("EA vs. SA Convergence, normalised by fitness evaluations")
+        ax.set_title(f"EA vs. SA convergence, fidelity, normalised by fitness\n"
+                     f"evaluations ({N_QUBITS}-qubit circuits)")
         ax.set_xlabel(f"Number of fitness evaluations "
                        f"(EA: generation $\\times$ {pop_size}, SA: iteration)")
         ax.set_ylabel("Best fidelity")
@@ -260,7 +272,7 @@ def plot_convergence(ea_histories, sa_histories, path, pop_size=None):
     axes[0].plot(ea_mean, color="tab:blue", label="EA (mean)")
     axes[0].fill_between(range(len(ea_mean)), ea_mean - ea_std, ea_mean + ea_std,
                           alpha=0.2, color="tab:blue")
-    axes[0].set_title("EA Convergence")
+    axes[0].set_title(f"EA convergence, fidelity ({N_QUBITS}-qubit circuits)")
     axes[0].set_xlabel("Generation")
     axes[0].set_ylabel("Best fidelity")
     axes[0].legend()
@@ -268,7 +280,7 @@ def plot_convergence(ea_histories, sa_histories, path, pop_size=None):
     axes[1].plot(sa_mean, color="tab:orange", label="SA (mean)")
     axes[1].fill_between(range(len(sa_mean)), sa_mean - sa_std, sa_mean + sa_std,
                           alpha=0.2, color="tab:orange")
-    axes[1].set_title("SA Convergence")
+    axes[1].set_title(f"SA convergence, fidelity ({N_QUBITS}-qubit circuits)")
     axes[1].set_xlabel("Iteration")
     axes[1].set_ylabel("Best fidelity")
     axes[1].legend()
@@ -279,9 +291,122 @@ def plot_convergence(ea_histories, sa_histories, path, pop_size=None):
     print(f"Saved side-by-side convergence plot to {path}")
 
 
+def plot_fitness_convergence(ea_fitness_histories, sa_fitness_histories, path,
+                              pop_size=None):
+    """
+    Saves convergence plots for fitness rather than fidelity.
+
+    plot_convergence() above tracks fidelity, which is only one of the two
+    components of the objective the algorithms actually maximise
+    (alpha*fidelity - beta*gate_count). These plots show that objective
+    itself, so the curves correspond directly to what the search is
+    optimising.
+
+    Produces a separate panel per algorithm (EA and SA are plotted apart,
+    since a generation and an iteration are not the same unit of work),
+    plus, if pop_size is given, a shared-axis version normalised by number
+    of fitness evaluations, which is the only fair basis for comparing the
+    two algorithms' progress against each other.
+    """
+    ea_arr = np.array(ea_fitness_histories)
+    sa_arr = np.array(sa_fitness_histories)
+    ea_mean, ea_std = ea_arr.mean(axis=0), ea_arr.std(axis=0)
+    sa_mean, sa_std = sa_arr.mean(axis=0), sa_arr.std(axis=0)
+
+    # --- Separate panels, one per algorithm ---
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    axes[0].plot(ea_mean, color="tab:blue", label="EA (mean)")
+    axes[0].fill_between(range(len(ea_mean)), ea_mean - ea_std, ea_mean + ea_std,
+                          alpha=0.2, color="tab:blue")
+    axes[0].set_title(f"EA convergence, fitness ({N_QUBITS}-qubit circuits)")
+    axes[0].set_xlabel("Generation")
+    axes[0].set_ylabel(r"Best fitness ($\alpha\cdot$fidelity $-\ \beta\cdot$gate count)")
+    axes[0].legend()
+    axes[0].grid(True, alpha=0.3)
+
+    axes[1].plot(sa_mean, color="tab:orange", label="SA (mean)")
+    axes[1].fill_between(range(len(sa_mean)), sa_mean - sa_std, sa_mean + sa_std,
+                          alpha=0.2, color="tab:orange")
+    axes[1].set_title(f"SA convergence, fitness ({N_QUBITS}-qubit circuits)")
+    axes[1].set_xlabel("Iteration")
+    axes[1].set_ylabel(r"Best fitness ($\alpha\cdot$fidelity $-\ \beta\cdot$gate count)")
+    axes[1].legend()
+    axes[1].grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(path, dpi=150)
+    plt.close(fig)
+    print(f"Saved side-by-side fitness convergence plot to {path}")
+
+    # --- Shared axis, normalised by fitness evaluations ---
+    if pop_size is not None:
+        fig2, ax = plt.subplots(figsize=(7, 5))
+        ea_x = np.arange(len(ea_mean)) * pop_size
+        sa_x = np.arange(len(sa_mean))
+        ax.plot(ea_x, ea_mean, color="tab:blue", label="EA (mean)")
+        ax.fill_between(ea_x, ea_mean - ea_std, ea_mean + ea_std,
+                         alpha=0.2, color="tab:blue")
+        ax.plot(sa_x, sa_mean, color="tab:orange", label="SA (mean)")
+        ax.fill_between(sa_x, sa_mean - sa_std, sa_mean + sa_std,
+                         alpha=0.2, color="tab:orange")
+        ax.set_title(f"EA vs. SA convergence, fitness, normalised by fitness\n"
+                     f"evaluations ({N_QUBITS}-qubit circuits)")
+        ax.set_xlabel(f"Number of fitness evaluations "
+                       f"(EA: generation $\\times$ {pop_size}, SA: iteration)")
+        ax.set_ylabel(r"Best fitness ($\alpha\cdot$fidelity $-\ \beta\cdot$gate count)")
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+        p2 = path.replace(".png", "_by_evaluations.png")
+        plt.savefig(p2, dpi=150)
+        plt.close(fig2)
+        print(f"Saved evaluation-normalised fitness convergence plot to {p2}")
+
+
+def plot_final_comparison_bars(rows, path):
+    """
+    Bar chart comparing EA and SA on the two reported metrics for the
+    final circuits: mean fidelity and mean fitness. Error bars are the
+    standard deviation across targets.
+
+    Fitness is recomputed here from each final circuit's reported fidelity
+    and gate count (fitness = alpha*fidelity - beta*gate_count), using the
+    same alpha/beta the run was configured with, so the two bars refer to
+    exactly the same circuits.
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4.5))
+
+    for ax, (metric, label) in zip(axes, (("fidelity", "Mean fidelity"),
+                                           ("fitness", "Mean fitness"))):
+        means, stds = [], []
+        for algo in ("EA", "SA"):
+            vals = []
+            for r in rows:
+                if r["algorithm"] != algo:
+                    continue
+                if metric == "fidelity":
+                    vals.append(r["fidelity"])
+                else:
+                    vals.append(ALPHA * r["fidelity"] - BETA * r["gate_count"])
+            means.append(np.mean(vals))
+            stds.append(np.std(vals))
+
+        ax.bar(["EA", "SA"], means, yerr=stds, capsize=6,
+               color=["tab:blue", "tab:orange"])
+        ax.set_ylabel(label)
+        ax.set_title(f"{label} of final circuits ({N_QUBITS} qubits)")
+        ax.grid(True, axis="y", alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(path, dpi=150)
+    plt.close(fig)
+    print(f"Saved final-comparison bar chart to {path}")
+
+
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    rows, ea_histories, sa_histories = run_all()
+    (rows, ea_histories, sa_histories,
+     ea_fitness_histories, sa_fitness_histories) = run_all()
 
     save_csv(rows, os.path.join(RUN_DIR, "results.csv"))
     save_config(os.path.join(RUN_DIR, "config.json"))
@@ -289,5 +414,10 @@ if __name__ == "__main__":
     plot_convergence(ea_histories, sa_histories,
                       os.path.join(RUN_DIR, "convergence.png"),
                       pop_size=EA_PARAMS["pop_size"])
+    plot_fitness_convergence(ea_fitness_histories, sa_fitness_histories,
+                              os.path.join(RUN_DIR, "convergence_fitness.png"),
+                              pop_size=EA_PARAMS["pop_size"])
+    plot_final_comparison_bars(rows,
+                                os.path.join(RUN_DIR, "final_comparison_bars.png"))
 
     print(f"\nRun complete. All outputs for this run are in: {RUN_DIR}")
