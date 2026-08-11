@@ -109,6 +109,7 @@ def evolutionary_algorithm(
     pop_size: int = 50,
     n_generations: int = 200,
     mutation_rate: float = 0.1,
+    crossover_rate: float = 1.0,
     alpha: float = 1.0,
     beta: float = 0.01,
     verbose: bool = True,
@@ -121,6 +122,17 @@ def evolutionary_algorithm(
     - Start with a population of random circuits (variable length)
     - Each generation: evaluate, select best, crossover, mutate
     - Elitism: always keep the best individual unchanged
+
+    crossover_rate: probability, per pair of selected parents, that
+                    crossover() is applied at all; with probability
+                    (1 - crossover_rate) the pair is instead cloned
+                    unchanged into the next generation (mutation still
+                    applies afterwards either way, see Step 5). Defaults
+                    to 1.0 (crossover always applied), matching every
+                    result reported in this thesis up to and including
+                    the main comparison (research_log.md Entry 9/12/13)
+                    -- passing any other value is an explicit ablation,
+                    not a change to those results.
 
     fitness_fn: optional custom fitness function (see evaluate_population).
                 Defaults to the standard alpha*fidelity - beta*gate_count
@@ -167,12 +179,19 @@ def evolutionary_algorithm(
         n_select = pop_size // 2
         selected = selection(population, scores, n_select)
 
-        # Step 4: Crossover -- fill population back to pop_size
+        # Step 4: Crossover -- fill population back to pop_size.
+        # With probability crossover_rate, recombine the pair; otherwise
+        # clone both parents unchanged (still subject to mutation below).
+        # At the default crossover_rate=1.0, np.random.random() is never
+        # called here, so this is byte-for-byte the pre-existing behaviour.
         new_population = selected[:]
         while len(new_population) < pop_size:
             p1 = selected[np.random.randint(len(selected))]
             p2 = selected[np.random.randint(len(selected))]
-            c1, c2 = crossover(p1, p2)
+            if crossover_rate >= 1.0 or np.random.random() < crossover_rate:
+                c1, c2 = crossover(p1, p2)
+            else:
+                c1, c2 = p1[:], p2[:]
             new_population.extend([c1, c2])
         population = new_population[:pop_size]
 
