@@ -17,8 +17,10 @@ For each target state, separates two sources of variance:
     different Haar-random states
 
 Output: results/runs/<run_id>/ containing repeated_results.csv (one row
-per target x repeat x algorithm), repeated_summary.csv (per-target
-mean/std), and config.json.
+per target x repeat x algorithm, including both fidelity and fitness),
+repeated_summary.csv (per-target mean/std for both), config.json, and
+final_comparison_bars.png (bar chart of mean fidelity and mean fitness
+across all target x repeat samples, error bars = std across samples).
 
 Usage:
     cd thesis-code
@@ -31,6 +33,7 @@ import csv
 import json
 from datetime import datetime
 import numpy as np
+import matplotlib.pyplot as plt
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SRC_DIR = os.path.join(SCRIPT_DIR, "..", "src")
@@ -117,6 +120,8 @@ def run_all():
                 "algorithm": "EA",
                 "fidelity": ea_result["best_fidelity"],
                 "gate_count": ea_result["best_gate_count"],
+                "fitness": ALPHA * ea_result["best_fidelity"]
+                           - BETA * ea_result["best_gate_count"],
             })
 
             np.random.seed(repeat_seed)
@@ -127,6 +132,8 @@ def run_all():
                 "algorithm": "SA",
                 "fidelity": sa_result["best_fidelity"],
                 "gate_count": sa_result["best_gate_count"],
+                "fitness": ALPHA * sa_result["best_fidelity"]
+                           - BETA * sa_result["best_gate_count"],
             })
 
             print(f"  Repeat {rep + 1}/{N_REPEATS}: "
@@ -142,7 +149,7 @@ def run_all():
 def save_raw_csv(rows, path):
     """Writes one row per (target, repeat, algorithm) run."""
     fieldnames = ["target_idx", "target_seed", "repeat", "repeat_seed",
-                  "algorithm", "fidelity", "gate_count"]
+                  "algorithm", "fidelity", "gate_count", "fitness"]
     with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -164,6 +171,7 @@ def save_summary_csv(rows, path):
                             if r["algorithm"] == algo and r["target_idx"] == i]
             fidelities = [r["fidelity"] for r in target_rows]
             gate_counts = [r["gate_count"] for r in target_rows]
+            fitnesses = [r["fitness"] for r in target_rows]
             per_target_rows.append({
                 "algorithm": algo, "target_idx": i,
                 "n_repeats": len(target_rows),
@@ -171,10 +179,13 @@ def save_summary_csv(rows, path):
                 "std_fidelity": np.std(fidelities),
                 "mean_gate_count": np.mean(gate_counts),
                 "std_gate_count": np.std(gate_counts),
+                "mean_fitness": np.mean(fitnesses),
+                "std_fitness": np.std(fitnesses),
             })
 
     fieldnames = ["algorithm", "target_idx", "n_repeats", "mean_fidelity",
-                  "std_fidelity", "mean_gate_count", "std_gate_count"]
+                  "std_fidelity", "mean_gate_count", "std_gate_count",
+                  "mean_fitness", "std_fitness"]
     with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -190,8 +201,10 @@ def save_summary_csv(rows, path):
         avg_within_target_fidelity_std = np.mean([r["std_fidelity"] for r in algo_rows])
         across_target_fidelity_std = np.std([r["mean_fidelity"] for r in algo_rows])
 
+        overall_fitness = np.mean([r["mean_fitness"] for r in algo_rows])
         print(f"{algo}: mean fidelity = {overall_fidelity:.4f}, "
-              f"mean gate count = {overall_gate_count:.2f}")
+              f"mean gate count = {overall_gate_count:.2f}, "
+              f"mean fitness = {overall_fitness:.4f}")
         print(f"     avg within-target fidelity std (run-to-run noise) = "
               f"{avg_within_target_fidelity_std:.4f}")
         print(f"     across-target fidelity std (target difficulty variation) = "
@@ -210,6 +223,41 @@ def save_config(path):
     print(f"Saved run config to {path}")
 
 
+def plot_final_comparison_bars(rows, path):
+    """
+    Bar chart comparing EA and SA on mean fidelity and mean fitness of the
+    final circuits, using every (target, repeat) sample -- N_TARGETS *
+    N_REPEATS = 160 samples per algorithm with the default configuration,
+    the same data underlying the thesis's primary reported comparison
+    (Section 5.2). Error bars are the standard deviation across all
+    samples (pooled across targets and repeats, matching the scale on
+    which the two bars are compared; see sweep_beta_repeated.py for the
+    separate within-/across-target decomposition used in the beta-sweep
+    figures, not needed here since this plot is not broken down by beta).
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4.5))
+
+    for ax, (metric, label) in zip(axes, (("fidelity", "Mean fidelity"),
+                                           ("fitness", "Mean fitness"))):
+        means, stds = [], []
+        for algo in ("EA", "SA"):
+            vals = [r[metric] for r in rows if r["algorithm"] == algo]
+            means.append(np.mean(vals))
+            stds.append(np.std(vals))
+
+        ax.bar(["EA", "SA"], means, yerr=stds, capsize=6,
+               color=["tab:blue", "tab:orange"])
+        ax.set_ylabel(label)
+        ax.set_title(f"{label} of final circuits ({N_QUBITS} qubits, "
+                     f"N={N_TARGETS * N_REPEATS} samples)")
+        ax.grid(True, axis="y", alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(path, dpi=150)
+    plt.close(fig)
+    print(f"Saved final-comparison bar chart to {path}")
+
+
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     rows = run_all()
@@ -217,5 +265,6 @@ if __name__ == "__main__":
     save_raw_csv(rows, os.path.join(RUN_DIR, "repeated_results.csv"))
     save_summary_csv(rows, os.path.join(RUN_DIR, "repeated_summary.csv"))
     save_config(os.path.join(RUN_DIR, "config.json"))
+    plot_final_comparison_bars(rows, os.path.join(RUN_DIR, "final_comparison_bars.png"))
 
     print(f"\nRun complete. All outputs in: {RUN_DIR}")
