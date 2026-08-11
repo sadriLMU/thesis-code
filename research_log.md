@@ -837,3 +837,149 @@ previously logged.
   outside the scope of what this thesis needs to address? _______________
 
 ---
+
+## Entry 14 - 2026-08-11 - Fitness tracking added to EA/SA, in response to supervisor feedback
+
+**Files changed:** src/ea.py, src/sa.py, experiments/run_experiments.py,
+experiments/run_experiments_repeated.py
+
+**Why this change:** supervisor feedback requested fitness (not just
+fidelity) tracked per generation/iteration, separately for EA and SA, and
+fidelity + fitness reported together for final circuits. Both
+evolutionary_algorithm() and simulated_annealing() already computed
+fitness internally for selection -- this change only records it
+(fitness_history return key), it does not alter search behaviour. Verified
+against unpatched code on 5 seeds: identical fidelity/gate_count output.
+
+**New outputs:** convergence_fitness.png / convergence_fitness_by_evaluations.png
+(run_experiments.py), final_comparison_bars.png (both run_experiments.py
+and run_experiments_repeated.py, the latter using the full N=160 sample).
+
+**Your interpretation (fill in):**
+- _______________
+
+---
+
+## Entry 15 - 2026-08-11 - Manual hyperparameter ablations (pop_size, mutation_rate, crossover_rate)
+
+**Files changed:** experiments/tune_hyperparams_manual.py (new),
+experiments/crossover_rate_ablation.py (new), src/ea.py (added optional
+crossover_rate parameter, default 1.0, backward-compatible)
+
+**Why this change:** supervisor feedback suggested checking
+literature-typical hyperparameter values manually (e.g. population 200,
+crossover rate ~0.8, cf. Sunkel et al. 2025's crossover rate of 0.85),
+rather than relying solely on the Optuna search. Both ablations run on
+the tuning seeds (100-104), disjoint from reporting seeds, matching
+tune_hyperparams.py's methodology.
+
+**Findings:**
+- pop_size grid (50/67/100/200) x mutation_rate grid (0.02-0.30): current
+  tuned config (pop_size=67, mutation_rate=0.0779) ranks 3rd of 20 by raw
+  fitness; gap to the top config (pop_size=200) is not statistically
+  distinguishable from noise (5 targets, std ~0.05-0.09). At matched
+  compute budget (fitness_per_1k_evals), smaller populations are 3-4x
+  more efficient -- larger population is not a free improvement.
+- crossover_rate 1.0 (current) vs 0.8: mean fitness 0.3234 vs 0.3155
+  (N=25 each), gap/SE ratio 0.34 -- not distinguishable from noise.
+
+**Conclusion:** no evidence that either alternative would improve on the
+current tuned configuration; current config retained unchanged.
+
+**Your interpretation (fill in):**
+- _______________
+
+---
+
+## Entry 16 - 2026-08-11 - Extended beta sweep (0.01-0.30), checking for an EA/SA crossover at high beta
+
+**Files changed:** experiments/sweep_beta_extended_quick.py (new),
+experiments/sweep_beta_extended_full.py (new)
+
+**Why this change:** the main beta sweep (Entry 8/13) only covers
+beta=0.01-0.07, where the EA/SA fidelity gap narrows but does not close.
+Checked whether SA eventually overtakes EA at higher beta, beyond the
+originally tested range.
+
+**Findings (full version, N=5 repeats/target/beta, beta=0.01-0.30):**
+gap never reverses (EA >= SA at every beta tested); gap shrinks to
+near-zero for beta >= 0.20 (e.g. beta=0.30: EA 0.173 vs SA 0.166, gap
+0.007). Mean gate count for BOTH algorithms converges to ~1 gate by
+beta=0.30 (SA: exactly 1.00 +/- 0.00 across all 100 samples), i.e. the
+search problem degenerates to a near-trivial solution independent of
+search strategy at high beta -- the closing gap reflects the problem
+becoming trivial for both algorithms, not SA improving relative to EA.
+
+**Your interpretation (fill in):**
+- _______________
+
+---
+
+## Entry 17 - 2026-08-11 - Budget-matched EA/SA comparison (controlling for fitness-evaluation count)
+
+**Files changed:** experiments/budget_matched_comparison.py (new)
+
+**Why this change:** the main comparison (Entry 9/12/13) does not
+control for total fitness-evaluation budget: EA uses pop_size(67) x
+n_generations(100) = 6,700 evaluations per run; SA's tuned cooling
+schedule (cooling_rate=0.9769) terminates after only ~330-336 iterations
+(evaluations), reaching min_temp far before the max_iterations=2000 cap.
+This is roughly a 20x difference in search effort, unaccounted for in
+the headline comparison. This experiment adds a third condition,
+SA_matched, with cooling_rate solved analytically
+(cooling_rate = (min_temp/initial_temp)^(1/6700) = 0.998829) so SA also
+receives ~6,700 evaluations; initial_temp is left at its Optuna-tuned
+value (this experiment asks "what if SA searched as long as EA," not "what
+is the best SA config for this budget" -- a natural further follow-up).
+Run on the REPORTING seeds (42-61), not the tuning seeds, since
+cooling_rate here is computed analytically from a budget constraint, not
+selected by comparing candidates -- see script docstring for the full
+reasoning. N=20 targets x 5 repeats = 100 samples per condition.
+Wall-clock time (time.time(), single machine, sequential runs, not a
+rigorous benchmark) recorded alongside fidelity/fitness/gate count.
+
+**Findings:**
+
+| Condition | n_evaluations | Mean fidelity | Mean fitness | Mean gates | Mean wall-clock |
+|---|---|---|---|---|---|
+| EA | 6,700 | 0.4675 +/- 0.0396 (within) | 0.4190 | 4.85 | 2.60s |
+| SA (standard) | ~336 | 0.3790 +/- 0.0642 (within) | 0.3154 | 6.36 | 0.19s |
+| SA (matched) | 6,700 | 0.5645 +/- 0.0436 (within) | 0.4795 | 8.50 | 4.03s |
+
+EA and SA (standard) numbers match Entry 8 exactly, confirming this is
+the same underlying comparison, just extended with a third condition.
+
+**SA (matched) significantly outperforms EA on both fidelity and fitness**
+once evaluation count is equalised: gap = -0.097 fidelity (SA ahead),
+gap/pooled-SE ratio ~16.5 (N=100 each) -- not a marginal effect. SA wins
+despite a higher mean gate count (8.5 vs 4.85); the fidelity gain
+(+0.097) outweighs the extra gate penalty at beta=0.01 (+3.65 gates x
+0.01 = 0.037).
+
+Wall-clock time tells a separate, third story: SA (matched) takes ~55%
+longer in real time than EA despite equal evaluation counts (4.03s vs
+2.60s), suggesting SA's per-evaluation cost is higher than EA's in this
+implementation. SA (standard) remains by far the fastest condition
+(0.19s) for a fidelity only moderately below EA's.
+
+**This does not invalidate the main comparison (Entry 9/12/13) or the
+beta-sweep (Entry 8/13, 16)** -- those results are correct descriptions of
+each algorithm's behaviour under its own natural termination criterion,
+which remains a valid and practically relevant protocol. What this shows
+is that the EA advantage reported under that protocol is substantially
+attributable to unequal search effort rather than to EA's search strategy
+being intrinsically superior to SA's.
+
+**Your interpretation (fill in):**
+- Does this change how RQ2's answer should be framed in the Discussion
+  (e.g. "EA outperforms SA under natural termination criteria, but this
+  advantage is largely attributable to an unequal evaluation budget, not
+  to intrinsic search superiority") ? _______________
+- SA (matched) was not re-tuned for its new budget (initial_temp kept at
+  the value tuned for ~330 evaluations) -- worth a follow-up with
+  re-tuned initial_temp, or out of scope for this thesis? _______________
+- The wall-clock finding (SA costs more per evaluation) is unexplained --
+  worth investigating the implementation, or reported as an open
+  observation? _______________
+
+---
