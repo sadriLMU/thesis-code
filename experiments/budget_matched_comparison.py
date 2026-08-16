@@ -246,6 +246,16 @@ def save_summary_csv(rows, path):
         target_means = [np.mean(v) for v in per_target.values()]
         across_target_std = float(np.std(target_means))
 
+        # Same decomposition, computed from fitness rather than fidelity,
+        # so the fitness panel in plot_comparison() can show a run-to-run
+        # noise error bar too, consistent with the fidelity and wall-clock
+        # panels rather than showing no uncertainty at all.
+        per_target_fitness = {t: [r["fitness"] for r in vals if r["target_idx"] == t]
+                               for t in target_idxs}
+        within_stds_fitness = [np.std(v) for v in per_target_fitness.values() if len(v) > 1]
+        within_target_std_fitness = (float(np.mean(within_stds_fitness))
+                                      if within_stds_fitness else float("nan"))
+
         summary.append({
             "condition": cond, "n_evaluations_per_run": n_evals,
             "n_samples": len(fids),
@@ -253,6 +263,7 @@ def save_summary_csv(rows, path):
             "within_target_std": within_target_std,
             "across_target_std": across_target_std,
             "mean_fitness": np.mean(fits),
+            "within_target_std_fitness": within_target_std_fitness,
             "mean_gate_count": np.mean(gates),
             "mean_wall_clock_seconds": np.mean(wall_clocks),
             "std_wall_clock_seconds": np.std(wall_clocks),
@@ -260,8 +271,8 @@ def save_summary_csv(rows, path):
 
     fieldnames = ["condition", "n_evaluations_per_run", "n_samples",
                   "mean_fidelity", "std_fidelity", "within_target_std",
-                  "across_target_std", "mean_fitness", "mean_gate_count",
-                  "mean_wall_clock_seconds", "std_wall_clock_seconds"]
+                  "across_target_std", "mean_fitness", "within_target_std_fitness",
+                  "mean_gate_count", "mean_wall_clock_seconds", "std_wall_clock_seconds"]
     with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -317,7 +328,7 @@ def plot_comparison(summary, path):
     colors = ["tab:blue", "tab:orange", "tab:red"]
 
     panels = (("mean_fidelity", "Mean fidelity", "within_target_std"),
-              ("mean_fitness", "Mean fitness", None),
+              ("mean_fitness", "Mean fitness", "within_target_std_fitness"),
               ("mean_wall_clock_seconds", "Mean wall-clock time (s)", "std_wall_clock_seconds"))
 
     for ax, (metric, title, err_key) in zip(axes, panels):
