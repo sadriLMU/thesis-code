@@ -57,12 +57,47 @@ thesis-code/
 │   ├── verify_crossover.py     Prints the exact gate-list origin for a
 │   │                           crossover example, to verify correctness
 │   │                           independently of the circuit diagram
-│   └── plot_results_evolution.py
-│                               Supporting chart showing how results changed
-│                               across development stages. Writes to
-│                               results/figures_debug/, not results/figures/,
-│                               since it is explicitly not part of the
-│                               thesis body (internal reference only).
+│   ├── plot_results_evolution.py
+│   │                           Supporting chart showing how results changed
+│   │                           across development stages. Writes to
+│   │                           results/figures_debug/, not results/figures/,
+│   │                           since it is explicitly not part of the
+│   │                           thesis body (internal reference only).
+│   ├── sweep_beta_extended_quick.py / sweep_beta_extended_full.py
+│   │                           Extends the beta sweep beyond the original
+│   │                           0.01-0.07 range up to 0.30, checking whether
+│   │                           the EA/SA gap ever reverses at higher beta
+│   │                           (it does not; both algorithms converge
+│   │                           toward a near-trivial ~1-gate solution
+│   │                           instead). _quick uses fewer repeats for a
+│   │                           fast first look; _full matches the main
+│   │                           sweep's statistical rigor.
+│   ├── tune_hyperparams_manual.py
+│   │                           Manual grid search over pop_size and
+│   │                           mutation_rate (literature-typical values,
+│   │                           e.g. population 200), complementing the
+│   │                           Optuna search. Reports fitness-per-1000-
+│   │                           evaluations alongside raw fitness, since
+│   │                           larger populations get proportionally more
+│   │                           compute and would otherwise look better
+│   │                           purely from that.
+│   ├── crossover_rate_ablation.py
+│   │                           Checks EA's crossover_rate=1.0 (current
+│   │                           default) against 0.8 (literature-typical,
+│   │                           cf. Sünkel et al. 2025's 0.85) on the
+│   │                           tuning seeds. No significant difference
+│   │                           found; current default retained.
+│   └── budget_matched_comparison.py
+│                               Controlled follow-up to the main comparison:
+│                               EA and SA are given the SAME total number of
+│                               fitness evaluations (SA's cooling_rate is
+│                               solved analytically so it no longer
+│                               terminates early), rather than each running
+│                               to its own natural termination. Also
+│                               records wall-clock time. Central finding:
+│                               SA significantly outperforms EA once
+│                               evaluation budget is equalised -- see
+│                               research_log.md Entry 17.
 ├── results/
 │   ├── runs/                   Output of each experiment run (gitignored --
 │   │                           regenerate by re-running the scripts)
@@ -115,6 +150,18 @@ python experiments/sweep_beta_floor_repeated.py
 # representative example; takes ~2 minutes)
 python experiments/plot_circuits.py
 python experiments/verify_crossover.py
+
+# Extended beta sweep (checks for an EA/SA crossover beyond beta=0.07)
+python experiments/sweep_beta_extended_quick.py   # fast, fewer repeats
+python experiments/sweep_beta_extended_full.py    # full statistical rigor
+
+# Manual hyperparameter ablations, complementing tune_hyperparams.py
+python experiments/tune_hyperparams_manual.py     # pop_size, mutation_rate grid
+python experiments/crossover_rate_ablation.py     # crossover_rate 1.0 vs 0.8
+
+# Budget-matched EA/SA comparison (controls for fitness-evaluation count
+# and records wall-clock time -- see research_log.md Entry 17)
+python experiments/budget_matched_comparison.py
 ```
 
 Each experiment script creates its own timestamped output folder under

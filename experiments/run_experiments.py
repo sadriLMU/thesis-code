@@ -24,6 +24,7 @@ import sys
 import os
 import csv
 import json
+import shutil
 from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
@@ -73,6 +74,8 @@ SA_PARAMS = dict(
 
 RESULTS_DIR = os.path.join(SCRIPT_DIR, "..", "results")
 RUNS_DIR = os.path.join(RESULTS_DIR, "runs")
+FIGURES_DIR = os.path.join(RESULTS_DIR, "figures")
+os.makedirs(FIGURES_DIR, exist_ok=True)
 SUMMARY_PATH = os.path.join(RESULTS_DIR, "all_runs_summary.csv")
 os.makedirs(RUNS_DIR, exist_ok=True)
 
@@ -419,5 +422,18 @@ if __name__ == "__main__":
                               pop_size=EA_PARAMS["pop_size"])
     plot_final_comparison_bars(rows,
                                 os.path.join(RUN_DIR, "final_comparison_bars.png"))
+
+    # Also copy every plot to results/figures/ (unlike results/runs/, not
+    # gitignored) so this run's figures are actually committed to the
+    # repository -- see budget_matched_comparison.py for the same fix and
+    # rationale. plot_convergence()/plot_fitness_convergence() each
+    # produce more than one file (the base name plus _overlay and
+    # _overlay_by_evaluations variants), so all matching files in RUN_DIR
+    # are copied rather than listing every variant by hand.
+    import glob
+    for pattern in ("convergence*.png", "final_comparison_bars.png"):
+        for src in glob.glob(os.path.join(RUN_DIR, pattern)):
+            shutil.copy(src, os.path.join(FIGURES_DIR, os.path.basename(src)))
+    print(f"Also copied convergence and comparison plots to {FIGURES_DIR}")
 
     print(f"\nRun complete. All outputs for this run are in: {RUN_DIR}")
