@@ -34,6 +34,7 @@ import sys
 import os
 import csv
 import json
+import shutil
 from datetime import datetime
 import numpy as np
 
@@ -68,6 +69,8 @@ EA_PARAMS = dict(
 
 RESULTS_DIR = os.path.join(SCRIPT_DIR, "..", "results")
 RUNS_DIR = os.path.join(RESULTS_DIR, "runs")
+FIGURES_DIR = os.path.join(RESULTS_DIR, "figures")
+os.makedirs(FIGURES_DIR, exist_ok=True)
 os.makedirs(RUNS_DIR, exist_ok=True)
 
 RUN_ID = datetime.now().strftime("%Y%m%d_%H%M%S") + "_crossover_rate_ablation"
@@ -186,6 +189,15 @@ def save_config(path):
 if __name__ == "__main__":
     rows = run_ablation()
     save_raw_csv(rows, os.path.join(RUN_DIR, "crossover_rate_ablation.csv"))
-    save_summary_csv(rows, os.path.join(RUN_DIR, "crossover_rate_ablation_summary.csv"))
+    summary_path = os.path.join(RUN_DIR, "crossover_rate_ablation_summary.csv")
+    save_summary_csv(rows, summary_path)
     save_config(os.path.join(RUN_DIR, "config.json"))
+
+    # Also copy the summary to results/figures/ (not gitignored, unlike
+    # results/runs/) so this ablation's result is committed to the
+    # repository -- see budget_matched_comparison.py for the same fix and
+    # rationale.
+    shutil.copy(summary_path, os.path.join(FIGURES_DIR, "crossover_rate_ablation_summary.csv"))
+    print(f"Also copied summary to {FIGURES_DIR}")
+
     print(f"\nDone. All outputs in: {RUN_DIR}")

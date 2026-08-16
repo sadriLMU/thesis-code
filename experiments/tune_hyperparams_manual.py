@@ -49,6 +49,7 @@ import os
 import csv
 import json
 import itertools
+import shutil
 from datetime import datetime
 import numpy as np
 
@@ -83,6 +84,8 @@ MUTATION_RATES = [0.02, 0.05, 0.0779, 0.15, 0.30]
 
 RESULTS_DIR = os.path.join(SCRIPT_DIR, "..", "results")
 RUNS_DIR = os.path.join(RESULTS_DIR, "runs")
+FIGURES_DIR = os.path.join(RESULTS_DIR, "figures")
+os.makedirs(FIGURES_DIR, exist_ok=True)
 os.makedirs(RUNS_DIR, exist_ok=True)
 
 RUN_ID = datetime.now().strftime("%Y%m%d_%H%M%S") + "_manual_grid"
@@ -212,6 +215,10 @@ def save_config(path):
 if __name__ == "__main__":
     rows = run_grid()
     save_raw_csv(rows, os.path.join(RUN_DIR, "manual_grid.csv"))
-    save_summary_csv(rows, os.path.join(RUN_DIR, "manual_grid_summary.csv"))
+    summary_path = os.path.join(RUN_DIR, "manual_grid_summary.csv")
+    save_summary_csv(rows, summary_path)
     save_config(os.path.join(RUN_DIR, "config.json"))
+    shutil.copy(summary_path, os.path.join(FIGURES_DIR, "manual_grid_summary.csv"))
+    print(f"Also copied summary to {FIGURES_DIR}")
+
     print(f"\nDone. All outputs in: {RUN_DIR}")

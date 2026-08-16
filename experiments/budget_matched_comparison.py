@@ -74,6 +74,7 @@ import os
 import csv
 import json
 import time
+import shutil
 from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
@@ -133,6 +134,8 @@ SA_PARAMS_MATCHED["max_iterations"] = EA_TOTAL_EVALUATIONS
 
 RESULTS_DIR = os.path.join(SCRIPT_DIR, "..", "results")
 RUNS_DIR = os.path.join(RESULTS_DIR, "runs")
+FIGURES_DIR = os.path.join(RESULTS_DIR, "figures")
+os.makedirs(FIGURES_DIR, exist_ok=True)
 os.makedirs(RUNS_DIR, exist_ok=True)
 
 RUN_ID = datetime.now().strftime("%Y%m%d_%H%M%S") + "_budget_matched"
@@ -334,7 +337,20 @@ def plot_comparison(summary, path):
 if __name__ == "__main__":
     rows = run_comparison()
     save_raw_csv(rows, os.path.join(RUN_DIR, "budget_matched_comparison.csv"))
-    summary = save_summary_csv(rows, os.path.join(RUN_DIR, "budget_matched_comparison_summary.csv"))
+    summary_path = os.path.join(RUN_DIR, "budget_matched_comparison_summary.csv")
+    summary = save_summary_csv(rows, summary_path)
     save_config(os.path.join(RUN_DIR, "config.json"))
-    plot_comparison(summary, os.path.join(RUN_DIR, "budget_matched_comparison.png"))
+    plot_path = os.path.join(RUN_DIR, "budget_matched_comparison.png")
+    plot_comparison(summary, plot_path)
+
+    # Also copy summary + plot to results/figures/ (unlike results/runs/,
+    # not gitignored) so this experiment's results are actually committed
+    # to the repository, not just reproducible locally -- see README.md's
+    # reproducibility principle. The large raw per-run CSV
+    # (budget_matched_comparison.csv) is purely regenerable, so it is left
+    # in results/runs/ only.
+    shutil.copy(summary_path, os.path.join(FIGURES_DIR, "budget_matched_comparison_summary.csv"))
+    shutil.copy(plot_path, os.path.join(FIGURES_DIR, "budget_matched_comparison.png"))
+    print(f"Also copied summary and plot to {FIGURES_DIR}")
+
     print(f"\nDone. All outputs in: {RUN_DIR}")
