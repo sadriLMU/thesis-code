@@ -271,7 +271,13 @@ def plot_convergence(ea_histories, sa_histories, path, pop_size=None):
         print(f"Saved evaluation-normalised overlay plot to {overlay_evals_path}")
 
     # --- Side-by-side plot ---
-    fig2, axes = plt.subplots(1, 2, figsize=(12, 5))
+    # sharey=True (rather than leaving each panel auto-scaled) so that a
+    # reader comparing the two panels visually sees the true difference
+    # in final fidelity between EA and SA, not an artefact of each panel
+    # independently filling its own y-range -- side-by-side panels invite
+    # visual comparison regardless of what the caption says, so the axes
+    # should not silently understate a real difference in the data.
+    fig2, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
     axes[0].plot(ea_mean, color="tab:blue", label="EA (mean)")
     axes[0].fill_between(range(len(ea_mean)), ea_mean - ea_std, ea_mean + ea_std,
                           alpha=0.2, color="tab:blue")
@@ -285,8 +291,7 @@ def plot_convergence(ea_histories, sa_histories, path, pop_size=None):
                           alpha=0.2, color="tab:orange")
     axes[1].set_title(f"SA convergence, fidelity ({N_QUBITS}-qubit circuits)")
     axes[1].set_xlabel("Iteration")
-    axes[1].set_ylabel("Best fidelity")
-    axes[1].legend()
+    axes[1].tick_params(labelleft=True)  # sharey hides these by default
 
     plt.tight_layout()
     plt.savefig(path, dpi=150)
@@ -317,7 +322,12 @@ def plot_fitness_convergence(ea_fitness_histories, sa_fitness_histories, path,
     sa_mean, sa_std = sa_arr.mean(axis=0), sa_arr.std(axis=0)
 
     # --- Separate panels, one per algorithm ---
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    # sharey=True for the same reason as plot_convergence()'s side-by-side
+    # panels: side-by-side placement invites visual comparison regardless
+    # of caption text, so the axes should show the true difference in
+    # fitness reached rather than each panel independently filling its
+    # own auto-scaled range.
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
     axes[0].plot(ea_mean, color="tab:blue", label="EA (mean)")
     axes[0].fill_between(range(len(ea_mean)), ea_mean - ea_std, ea_mean + ea_std,
                           alpha=0.2, color="tab:blue")
@@ -332,7 +342,7 @@ def plot_fitness_convergence(ea_fitness_histories, sa_fitness_histories, path,
                           alpha=0.2, color="tab:orange")
     axes[1].set_title(f"SA convergence, fitness ({N_QUBITS}-qubit circuits)")
     axes[1].set_xlabel("Iteration")
-    axes[1].set_ylabel(r"Best fitness ($\alpha\cdot$fidelity $-\ \beta\cdot$gate count)")
+    axes[1].tick_params(labelleft=True)  # sharey hides these by default
     axes[1].legend()
     axes[1].grid(True, alpha=0.3)
 
@@ -421,7 +431,7 @@ if __name__ == "__main__":
                               os.path.join(RUN_DIR, "convergence_fitness.png"),
                               pop_size=EA_PARAMS["pop_size"])
     plot_final_comparison_bars(rows,
-                                os.path.join(RUN_DIR, "final_comparison_bars.png"))
+                                os.path.join(RUN_DIR, "final_comparison_bars_single_run.png"))
 
     # Also copy every plot to results/figures/ (unlike results/runs/, not
     # gitignored) so this run's figures are actually committed to the
@@ -431,7 +441,7 @@ if __name__ == "__main__":
     # _overlay_by_evaluations variants), so all matching files in RUN_DIR
     # are copied rather than listing every variant by hand.
     import glob
-    for pattern in ("convergence*.png", "final_comparison_bars.png"):
+    for pattern in ("convergence*.png", "final_comparison_bars_single_run.png"):
         for src in glob.glob(os.path.join(RUN_DIR, pattern)):
             shutil.copy(src, os.path.join(FIGURES_DIR, os.path.basename(src)))
     print(f"Also copied convergence and comparison plots to {FIGURES_DIR}")
