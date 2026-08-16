@@ -158,17 +158,21 @@ def select_representative_target():
 # ---------------------------------------------------------------------------
 def save_circuit_diagram(gates, title, filename):
     """
-    Builds a Qiskit circuit from a gate-dict list and saves a diagram.
+    Builds a Qiskit circuit from a gate-dict list and saves a diagram,
+    with the title rendered directly onto the image via fig.suptitle().
 
-    Note: `title` is descriptive metadata used in the console log and in
-    CAPTIONS.md; Qiskit's mpl drawer does not render circuit.name as
-    visible text in the output image itself, so the actual numbers
-    (fidelity, gate count) must come from the caption in the LaTeX
-    source, not the image -- see CAPTIONS.md for ready-to-use text.
+    Note: setting qc.name alone is not enough -- Qiskit's mpl drawer does
+    not render circuit.name as visible text in the output image, so the
+    title (which carries the fidelity and gate count) is added
+    explicitly here. CAPTIONS.md still provides the same text ready to
+    paste into the LaTeX caption, since a caption is expected regardless
+    of what is baked into the image, but the image is no longer
+    meaningless without it.
     """
     qc = build_circuit(N_QUBITS, gates)
     qc.name = title
     fig = qc.draw(output="mpl")
+    fig.suptitle(title, fontsize=11, y=1.02)
     path = os.path.join(FIGURES_DIR, filename)
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -273,7 +277,8 @@ if __name__ == "__main__":
     save_circuit_diagram(
         ea_result["best_circuit"],
         f"Best EA circuit (target seed={best_seed}, "
-        f"fidelity={ea_result['best_fidelity']:.3f})",
+        f"fidelity={ea_result['best_fidelity']:.3f}, "
+        f"{ea_result['best_gate_count']} gates)",
         "best_circuit_ea.png",
     )
     log_caption(
@@ -289,7 +294,8 @@ if __name__ == "__main__":
     save_circuit_diagram(
         sa_result["best_circuit"],
         f"Best SA circuit (target seed={best_seed}, "
-        f"fidelity={sa_result['best_fidelity']:.3f})",
+        f"fidelity={sa_result['best_fidelity']:.3f}, "
+        f"{sa_result['best_gate_count']} gates)",
         "best_circuit_sa.png",
     )
     log_caption(
