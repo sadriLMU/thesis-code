@@ -80,7 +80,9 @@ SA_PARAMS = dict(
 
 RESULTS_DIR = os.path.join(SCRIPT_DIR, "..", "results")
 RUNS_DIR = os.path.join(RESULTS_DIR, "runs")
+FIGURES_DIR = os.path.join(RESULTS_DIR, "figures")
 os.makedirs(RUNS_DIR, exist_ok=True)
+os.makedirs(FIGURES_DIR, exist_ok=True)
 
 RUN_ID = datetime.now().strftime("%Y%m%d_%H%M%S") + "_repeated"
 RUN_DIR = os.path.join(RUNS_DIR, RUN_ID)
@@ -260,11 +262,25 @@ def plot_final_comparison_bars(rows, path):
 
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
+    import shutil
+
     rows = run_all()
 
     save_raw_csv(rows, os.path.join(RUN_DIR, "repeated_results.csv"))
     save_summary_csv(rows, os.path.join(RUN_DIR, "repeated_summary.csv"))
     save_config(os.path.join(RUN_DIR, "config.json"))
-    plot_final_comparison_bars(rows, os.path.join(RUN_DIR, "final_comparison_bars.png"))
+    plot_path = os.path.join(RUN_DIR, "final_comparison_bars.png")
+    plot_final_comparison_bars(rows, plot_path)
+
+    # Also copy the bar chart to results/figures/ (not gitignored, unlike
+    # results/runs/) so this N=160 result is the one that actually ends
+    # up in the repository -- see budget_matched_comparison.py for the
+    # same fix and rationale. Without this, the file sitting in
+    # results/figures/ could silently be a stale copy from an earlier,
+    # less statistically robust run (e.g. run_experiments.py's N=20
+    # single-run version, which now writes to a differently named file
+    # specifically to avoid this collision).
+    shutil.copy(plot_path, os.path.join(FIGURES_DIR, "final_comparison_bars.png"))
+    print(f"Also copied bar chart to {FIGURES_DIR}")
 
     print(f"\nRun complete. All outputs in: {RUN_DIR}")
