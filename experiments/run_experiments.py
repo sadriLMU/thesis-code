@@ -249,7 +249,7 @@ def plot_convergence(ea_histories, sa_histories, path, pop_size=None):
 
     # --- Overlay normalised by number of fitness evaluations ---
     if pop_size is not None:
-        fig1b, ax = plt.subplots(figsize=(7, 5))
+        fig1b, ax = plt.subplots(figsize=(7, 4.2))
         ea_x = np.arange(len(ea_mean)) * pop_size  # 1 generation = pop_size evals
         sa_x = np.arange(len(sa_mean))              # 1 iteration = 1 eval
         ax.plot(ea_x, ea_mean, color="tab:blue", label="EA (mean)")
@@ -277,7 +277,7 @@ def plot_convergence(ea_histories, sa_histories, path, pop_size=None):
     # independently filling its own y-range -- side-by-side panels invite
     # visual comparison regardless of what the caption says, so the axes
     # should not silently understate a real difference in the data.
-    fig2, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+    fig2, axes = plt.subplots(1, 2, figsize=(12, 3.8), sharey=True)
     axes[0].plot(ea_mean, color="tab:blue", label="EA (mean)")
     axes[0].fill_between(range(len(ea_mean)), ea_mean - ea_std, ea_mean + ea_std,
                           alpha=0.2, color="tab:blue")
@@ -327,7 +327,7 @@ def plot_fitness_convergence(ea_fitness_histories, sa_fitness_histories, path,
     # of caption text, so the axes should show the true difference in
     # fitness reached rather than each panel independently filling its
     # own auto-scaled range.
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 3.8), sharey=True)
     axes[0].plot(ea_mean, color="tab:blue", label="EA (mean)")
     axes[0].fill_between(range(len(ea_mean)), ea_mean - ea_std, ea_mean + ea_std,
                           alpha=0.2, color="tab:blue")
@@ -353,7 +353,7 @@ def plot_fitness_convergence(ea_fitness_histories, sa_fitness_histories, path,
 
     # --- Shared axis, normalised by fitness evaluations ---
     if pop_size is not None:
-        fig2, ax = plt.subplots(figsize=(7, 5))
+        fig2, ax = plt.subplots(figsize=(7, 4.2))
         ea_x = np.arange(len(ea_mean)) * pop_size
         sa_x = np.arange(len(sa_mean))
         ax.plot(ea_x, ea_mean, color="tab:blue", label="EA (mean)")
