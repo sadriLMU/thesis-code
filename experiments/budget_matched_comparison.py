@@ -19,11 +19,14 @@ temperature decays to min_temp after exactly ~6,700 iterations:
 
     cooling_rate = (min_temp / initial_temp) ** (1 / target_evaluations)
 
-initial_temp is deliberately left at its Optuna-tuned value -- this
-experiment asks "what if SA searched for as long as EA does," not "what
-is the best SA configuration for a 6,700-evaluation budget" (a related
-but different question; re-tuning for the larger budget is a natural
-further follow-up if this comparison suggests it would be worthwhile).
+initial_temp is left at its Optuna-tuned value for the SA_matched
+condition below -- this experiment asks "what if SA searched for as
+long as EA does," not "what is the best SA configuration for a
+6,700-evaluation budget." A second condition, SA_matched_retuned, adds
+exactly that: initial_temp is re-tuned specifically for this budget
+(see experiments/tune_sa_budget_matched.py), while cooling_rate is
+still solved analytically so the evaluation budget remains matched to
+EA's.
 
 Runs on the REPORTING seeds (42-61), unlike the hyperparameter ablations
 in tune_hyperparams_manual.py and crossover_rate_ablation.py, which
@@ -132,6 +135,27 @@ SA_PARAMS_MATCHED = dict(SA_PARAMS_STANDARD)
 SA_PARAMS_MATCHED["cooling_rate"] = _MATCHED_COOLING_RATE
 SA_PARAMS_MATCHED["max_iterations"] = EA_TOTAL_EVALUATIONS
 
+# SA (matched, retuned): as SA_PARAMS_MATCHED above, but using an
+# initial_temp specifically re-tuned for the 6,700-evaluation budget
+# (see experiments/tune_sa_budget_matched.py) rather than reusing the
+# value tuned for SA's original, much shorter (~330-evaluation)
+# schedule. cooling_rate is recomputed for this new initial_temp so the
+# schedule still reaches min_temp after exactly EA_TOTAL_EVALUATIONS
+# iterations -- "budget-matched" continues to mean the same thing, only
+# initial_temp changes. Kept as a separate condition alongside
+# SA_PARAMS_MATCHED (not a replacement for it), so the effect of
+# re-tuning can be read off directly rather than silently overwriting
+# the original budget-matched result.
+_RETUNED_INITIAL_TEMP = 0.13393613963848172  # from tune_sa_budget_matched.py
+_MATCHED_RETUNED_COOLING_RATE = (
+    (SA_PARAMS_STANDARD["min_temp"] / _RETUNED_INITIAL_TEMP)
+    ** (1.0 / EA_TOTAL_EVALUATIONS)
+)
+SA_PARAMS_MATCHED_RETUNED = dict(SA_PARAMS_STANDARD)
+SA_PARAMS_MATCHED_RETUNED["initial_temp"] = _RETUNED_INITIAL_TEMP
+SA_PARAMS_MATCHED_RETUNED["cooling_rate"] = _MATCHED_RETUNED_COOLING_RATE
+SA_PARAMS_MATCHED_RETUNED["max_iterations"] = EA_TOTAL_EVALUATIONS
+
 RESULTS_DIR = os.path.join(SCRIPT_DIR, "..", "results")
 RUNS_DIR = os.path.join(RESULTS_DIR, "runs")
 FIGURES_DIR = os.path.join(RESULTS_DIR, "figures")
@@ -205,7 +229,22 @@ def run_comparison():
                 "wall_clock_seconds": sa_matched_wall_clock,
             })
 
-        print(f"  {N_REPEATS} repeats x 3 conditions done")
+            # --- SA (budget-matched, retuned initial_temp) ---
+            np.random.seed(repeat_seed)
+            t0 = time.time()
+            sa_retuned_result = simulated_annealing(target, n_qubits=N_QUBITS, **SA_PARAMS_MATCHED_RETUNED)
+            sa_retuned_wall_clock = time.time() - t0
+            rows.append({
+                "condition": "SA_matched_retuned", "target_idx": i, "target_seed": target_seed,
+                "repeat": rep,
+                "fidelity": sa_retuned_result["best_fidelity"],
+                "gate_count": sa_retuned_result["best_gate_count"],
+                "fitness": fitness_fn(sa_retuned_result["best_circuit"], target, N_QUBITS, ALPHA, BETA),
+                "n_evaluations": len(sa_retuned_result["fitness_history"]),
+                "wall_clock_seconds": sa_retuned_wall_clock,
+            })
+
+        print(f"  {N_REPEATS} repeats x 4 conditions done")
 
     return rows
 
@@ -228,7 +267,7 @@ def save_summary_csv(rows, path):
     sweep_beta_repeated.py), so this result is read on the same terms as
     the headline comparison it is checking.
     """
-    conditions = ["EA", "SA_standard", "SA_matched"]
+    conditions = ["EA", "SA_standard", "SA_matched", "SA_matched_retuned"]
     summary = []
     for cond in conditions:
         vals = [r for r in rows if r["condition"] == cond]
@@ -290,11 +329,14 @@ def save_summary_csv(rows, path):
     ea = next(r for r in summary if r["condition"] == "EA")
     sa_std = next(r for r in summary if r["condition"] == "SA_standard")
     sa_matched = next(r for r in summary if r["condition"] == "SA_matched")
+    sa_retuned = next(r for r in summary if r["condition"] == "SA_matched_retuned")
 
     gap_standard = ea["mean_fidelity"] - sa_std["mean_fidelity"]
     gap_matched = ea["mean_fidelity"] - sa_matched["mean_fidelity"]
+    gap_retuned = ea["mean_fidelity"] - sa_retuned["mean_fidelity"]
     print(f"\nEA vs SA (standard, unequal budget): gap = {gap_standard:.4f}")
     print(f"EA vs SA (budget-matched):            gap = {gap_matched:.4f}")
+    print(f"EA vs SA (budget-matched, retuned):    gap = {gap_retuned:.4f}")
 
     pooled_se = np.sqrt(ea["within_target_std"]**2 / ea["n_samples"]
                          + sa_matched["within_target_std"]**2 / sa_matched["n_samples"])
@@ -306,6 +348,16 @@ def save_summary_csv(rows, path):
         print(f">>> EA still ahead under equal budget "
               f"(gap/SE = {ratio:.2f}, {'likely real' if ratio > 2 else 'within noise'}).")
 
+    # Does re-tuning initial_temp for the matched budget change the result
+    # further, versus the original (non-retuned) SA_matched configuration?
+    retuning_gain = sa_retuned["mean_fidelity"] - sa_matched["mean_fidelity"]
+    pooled_se_retuning = np.sqrt(sa_matched["within_target_std"]**2 / sa_matched["n_samples"]
+                                  + sa_retuned["within_target_std"]**2 / sa_retuned["n_samples"])
+    ratio_retuning = abs(retuning_gain) / pooled_se_retuning if pooled_se_retuning > 0 else float("inf")
+    print(f"\nSA_matched_retuned vs. SA_matched: gain = {retuning_gain:.4f} "
+          f"(gap/SE = {ratio_retuning:.2f}, "
+          f"{'likely real' if ratio_retuning > 2 else 'within noise'}).")
+
     return summary
 
 
@@ -316,6 +368,7 @@ def save_config(path):
         "ea_params": EA_PARAMS, "ea_total_evaluations": EA_TOTAL_EVALUATIONS,
         "sa_params_standard": SA_PARAMS_STANDARD,
         "sa_params_matched": SA_PARAMS_MATCHED,
+        "sa_params_matched_retuned": SA_PARAMS_MATCHED_RETUNED,
     }
     with open(path, "w") as f:
         json.dump(config, f, indent=2)
@@ -323,9 +376,10 @@ def save_config(path):
 
 
 def plot_comparison(summary, path):
-    fig, axes = plt.subplots(1, 3, figsize=(14, 4.5))
-    labels = ["EA\n(6,700 evals)", "SA standard\n(~330 evals)", "SA matched\n(6,700 evals)"]
-    colors = ["tab:blue", "tab:orange", "tab:red"]
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
+    labels = ["EA\n(6,700 evals)", "SA standard\n(~330 evals)",
+              "SA matched\n(6,700 evals)", "SA matched\nretuned\n(6,700 evals)"]
+    colors = ["tab:blue", "tab:orange", "tab:red", "tab:green"]
 
     panels = (("mean_fidelity", "Mean fidelity", "within_target_std"),
               ("mean_fitness", "Mean fitness", "within_target_std_fitness"),
@@ -333,11 +387,12 @@ def plot_comparison(summary, path):
 
     for ax, (metric, title, err_key) in zip(axes, panels):
         means = [r[metric] for r in summary]
-        errs = [r[err_key] for r in summary] if err_key else [0, 0, 0]
+        errs = [r[err_key] for r in summary] if err_key else [0] * len(summary)
         ax.bar(labels, means, yerr=errs, capsize=6, color=colors)
         ax.set_ylabel(title)
         ax.set_title(f"{title} ({N_QUBITS} qubits)")
         ax.grid(True, axis="y", alpha=0.3)
+        ax.tick_params(axis="x", labelsize=8)
 
     plt.tight_layout()
     plt.savefig(path, dpi=150)
