@@ -87,17 +87,38 @@ thesis-code/
 │   │                           cf. Sünkel et al. 2025's 0.85) on the
 │   │                           tuning seeds. No significant difference
 │   │                           found; current default retained.
-│   └── budget_matched_comparison.py
-│                               Controlled follow-up to the main comparison:
-│                               EA and SA are given the SAME total number of
-│                               fitness evaluations (SA's cooling_rate is
-│                               solved analytically so it no longer
-│                               terminates early), rather than each running
-│                               to its own natural termination. Also
-│                               records wall-clock time. Central finding:
-│                               SA significantly outperforms EA once
-│                               evaluation budget is equalised -- see
-│                               research_log.md Entry 17.
+│   ├── budget_matched_comparison.py
+│   │                           Controlled follow-up to the main comparison:
+│   │                           EA and SA are given the SAME total number of
+│   │                           fitness evaluations (SA's cooling_rate is
+│   │                           solved analytically so it no longer
+│   │                           terminates early), rather than each running
+│   │                           to its own natural termination. Also
+│   │                           records wall-clock time. Central finding:
+│   │                           SA significantly outperforms EA once
+│   │                           evaluation budget is equalised -- see
+│   │                           research_log.md Entry 17.
+│   ├── tune_sa_budget_matched.py
+│   │                           Re-tunes SA's initial_temp specifically for
+│   │                           the 6,700-evaluation budget-matched schedule
+│   │                           (30 Optuna trials, cooling_rate fixed by the
+│   │                           budget-matching formula). Result: no
+│   │                           significant difference from the untuned
+│   │                           budget-matched condition on the full
+│   │                           reporting sample -- the cooling schedule
+│   │                           leaves initial_temp little room to matter,
+│   │                           and the apparent improvement during tuning
+│   │                           was noise from a single run per target. See
+│   │                           research_log.md for the full analysis.
+│   └── gate_budget_ablation.py
+│                               2x2 factorial check of whether max_gates=15
+│                               or beta=0.01 caps the fidelity EA reaches.
+│                               Result: max_gates is not the bottleneck (EA
+│                               uses 5-9 gates on average even when allowed
+│                               40); beta has a real but small effect. Not
+│                               tied to any of the three RQs -- optional
+│                               supporting evidence, referenced in
+│                               discussion.tex but not otherwise required.
 ├── results/
 │   ├── runs/                   Output of each experiment run (gitignored --
 │   │                           regenerate by re-running the scripts)
@@ -162,6 +183,13 @@ python experiments/crossover_rate_ablation.py     # crossover_rate 1.0 vs 0.8
 # Budget-matched EA/SA comparison (controls for fitness-evaluation count
 # and records wall-clock time -- see research_log.md Entry 17)
 python experiments/budget_matched_comparison.py
+
+# Re-tune SA's initial_temp for the budget-matched (6,700-eval) schedule
+python experiments/tune_sa_budget_matched.py
+
+# Gate-budget ablation: checks whether max_gates=15 or beta=0.01 is the
+# real cap on achievable fidelity (optional, supporting evidence only)
+python experiments/gate_budget_ablation.py
 ```
 
 Each experiment script creates its own timestamped output folder under
@@ -174,16 +202,28 @@ reproducible and traceable back to its exact configuration.
 (See the thesis PDF, Chapter 5, for full results and Chapter 6 for
 discussion.)
 
-- The evolutionary algorithm achieves consistently higher fidelity and
-  fidelity-per-gate than simulated annealing, confirmed via repeated runs
-  (5-8 repeats per target across 20 target states, 100-160 runs per
-  algorithm), validated both before and after a precision fix to EA's
-  mutation length-check (see `research_log.md` Entry 12).
-- This advantage holds across the entire tested range of the gate-count
-  penalty weight (beta), also confirmed via repeated runs
+- **Which algorithm wins depends on evaluation budget.** Under each
+  algorithm's own natural termination criterion, EA reaches higher
+  fidelity than SA (0.4660-0.4728 vs. 0.3688-0.3790, confirmed via
+  repeated runs across 20 target states, 100-160 runs per algorithm), but
+  EA uses roughly 20x more fitness evaluations to get there (~6,700 vs.
+  ~330-336). When evaluation budget is equalised at 6,700 for both
+  algorithms (`budget_matched_comparison.py`), SA overtakes EA
+  (0.5645 vs. 0.4675 fidelity, N=100 per condition, Gap/SE ~16.5). Neither
+  ranking is more "correct" than the other -- they answer different
+  questions about the same comparison (see `research_log.md` Entry 17).
+- Re-tuning SA's `initial_temp` specifically for the 6,700-evaluation
+  schedule (`tune_sa_budget_matched.py`) did not produce a further,
+  statistically distinguishable improvement over the untuned
+  budget-matched condition (0.5583 vs. 0.5645, Gap/SE ~1.0, N=100). The
+  budget-matching formula fixes `cooling_rate` so that both configurations
+  spend most of their iterations in a similar temperature range,
+  independent of `initial_temp`.
+- The EA/SA fidelity gap holds across the entire tested range of the
+  gate-count penalty weight (beta), confirmed via repeated runs
   (`sweep_beta_repeated.py`). Decomposing run-to-run noise from
-  target-to-target variation shows the EA/SA gap exceeds run-to-run noise
-  at every tested beta except the highest, where the margin narrows
+  target-to-target variation shows the gap exceeds run-to-run noise at
+  every tested beta except the highest, where the margin narrows
   alongside the mean gap itself (see `research_log.md` Entry 13).
 - An additional fitness-function variant with a hard minimum-fidelity
   constraint (following Sünkel et al.'s QCO fitness design) reliably
